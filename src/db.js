@@ -2,9 +2,10 @@
 
 const IS_MOCK_MODE_KEY = 'mediflow_use_mock';
 
-// Seed localStorage if empty
+// Seed localStorage if empty or outdated
 function initializeLocalStorage() {
-  if (!localStorage.getItem('mediflow_seeded')) {
+  const currentSeedVersion = localStorage.getItem('mediflow_seed_version');
+  if (!localStorage.getItem('mediflow_seeded') || currentSeedVersion !== 'v2') {
     localStorage.setItem('mediflow_clinics', JSON.stringify(window.INITIAL_CLINICS));
     localStorage.setItem('mediflow_users', JSON.stringify(window.INITIAL_USERS));
     localStorage.setItem('mediflow_patients', JSON.stringify(window.INITIAL_PATIENTS));
@@ -13,12 +14,17 @@ function initializeLocalStorage() {
     localStorage.setItem('mediflow_drugs', JSON.stringify(window.INITIAL_DRUGS));
     localStorage.setItem('mediflow_tests', JSON.stringify(window.INITIAL_TESTS));
     localStorage.setItem('mediflow_advice', JSON.stringify(window.INITIAL_ADVICE));
+    localStorage.setItem('mediflow_appointments', JSON.stringify(window.INITIAL_APPOINTMENTS || []));
+    localStorage.setItem('mediflow_bills', JSON.stringify(window.INITIAL_BILLS || []));
+    localStorage.setItem('mediflow_insurance', JSON.stringify(window.INITIAL_INSURANCE || []));
+    localStorage.setItem('mediflow_attendance', JSON.stringify(window.INITIAL_ATTENDANCE || []));
     
     // Seed clinic headers with empty defaults
     localStorage.setItem('mediflow_headers', JSON.stringify({}));
     
+    localStorage.setItem('mediflow_seed_version', 'v2');
     localStorage.setItem('mediflow_seeded', 'true');
-    console.log('LocalStorage initialized with seed mock data.');
+    console.log('LocalStorage initialized with version v2 Indian mock data.');
   }
 }
 
@@ -262,6 +268,85 @@ class DB {
         headers[payload.clinicId] = payload.dataUrl;
         localStorage.setItem('mediflow_headers', JSON.stringify(headers));
         return { success: true };
+      }
+
+      // --- Appointments ---
+      case 'getAppointments': {
+        const appointments = getList('mediflow_appointments');
+        return appointments.filter(a => a.clinicId === payload.clinicId);
+      }
+
+      case 'saveAppointment': {
+        const appointments = getList('mediflow_appointments');
+        const index = appointments.findIndex(a => a.id === payload.id);
+        if (index > -1) {
+          appointments[index] = { ...appointments[index], ...payload };
+        } else {
+          appointments.push(payload);
+        }
+        saveList('mediflow_appointments', appointments);
+        return payload;
+      }
+
+      case 'deleteAppointment': {
+        const appointments = getList('mediflow_appointments');
+        const filtered = appointments.filter(a => a.id !== payload.id);
+        saveList('mediflow_appointments', filtered);
+        return { success: true };
+      }
+
+      // --- Bills ---
+      case 'getBills': {
+        const bills = getList('mediflow_bills');
+        return bills.filter(b => b.clinicId === payload.clinicId);
+      }
+
+      case 'saveBill': {
+        const bills = getList('mediflow_bills');
+        const index = bills.findIndex(b => b.id === payload.id);
+        if (index > -1) {
+          bills[index] = { ...bills[index], ...payload };
+        } else {
+          bills.push(payload);
+        }
+        saveList('mediflow_bills', bills);
+        return payload;
+      }
+
+      // --- Insurance ---
+      case 'getInsurance': {
+        const insurance = getList('mediflow_insurance');
+        return insurance.filter(i => i.clinicId === payload.clinicId);
+      }
+
+      case 'saveInsurance': {
+        const insurance = getList('mediflow_insurance');
+        const index = insurance.findIndex(i => i.id === payload.id);
+        if (index > -1) {
+          insurance[index] = { ...insurance[index], ...payload };
+        } else {
+          insurance.push(payload);
+        }
+        saveList('mediflow_insurance', insurance);
+        return payload;
+      }
+
+      // --- Attendance ---
+      case 'getAttendance': {
+        const attendance = getList('mediflow_attendance');
+        return attendance.filter(a => a.clinicId === payload.clinicId);
+      }
+
+      case 'saveAttendance': {
+        const attendance = getList('mediflow_attendance');
+        const index = attendance.findIndex(a => a.id === payload.id);
+        if (index > -1) {
+          attendance[index] = { ...attendance[index], ...payload };
+        } else {
+          attendance.push(payload);
+        }
+        saveList('mediflow_attendance', attendance);
+        return payload;
       }
 
       default:

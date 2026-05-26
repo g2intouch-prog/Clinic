@@ -1,24 +1,49 @@
 const INITIAL_CLINICS = [
-  { id: 'clinic-1', name: 'City Health Clinic', subscription: 'Active', logoUrl: '' },
-  { id: 'clinic-2', name: 'Metro Dental Care', subscription: 'Active', logoUrl: '' }
+  { 
+    id: 'clinic-1', 
+    name: 'Aarogyam Multi-specialty Clinic', 
+    subscription: 'Active', 
+    logoUrl: '',
+    billingModel: 'Subscription',
+    rate: 5000, // ₹5000 / month
+    payments: [
+      { invoiceDate: '2026-03-01', amountDue: 5000, amountPaid: 5000, status: 'Paid', paymentDate: '2026-03-03' },
+      { invoiceDate: '2026-04-01', amountDue: 5000, amountPaid: 5000, status: 'Paid', paymentDate: '2026-04-02' },
+      { invoiceDate: '2026-05-01', amountDue: 5000, amountPaid: 0, status: 'Overdue', paymentDate: null }
+    ]
+  },
+  { 
+    id: 'clinic-2', 
+    name: 'Danta Seva Dental Care', 
+    subscription: 'Active', 
+    logoUrl: '',
+    billingModel: 'PerPatient',
+    rate: 20, // ₹20 / patient entry
+    payments: [
+      { invoiceDate: '2026-03-01', patientCount: 45, amountDue: 900, amountPaid: 900, status: 'Paid', paymentDate: '2026-03-05' },
+      { invoiceDate: '2026-04-01', patientCount: 52, amountDue: 1040, amountPaid: 1040, status: 'Paid', paymentDate: '2026-04-04' },
+      { invoiceDate: '2026-05-01', patientCount: 30, amountDue: 600, amountPaid: 600, status: 'Paid', paymentDate: '2026-05-05' }
+    ]
+  }
 ];
 
 const INITIAL_USERS = [
   // Super Admin
   { username: 'admin', password: 'password', role: 'admin', clinicId: null, name: 'Super Administrator' },
   // Clinic 1 Admin
-  { username: 'cadmin1', password: 'password', role: 'clinic_admin', clinicId: 'clinic-1', name: 'Alice Smith (Manager)' },
+  { username: 'cadmin1', password: 'password', role: 'clinic_admin', clinicId: 'clinic-1', name: 'Aarav Sharma (Manager)', status: 'Active' },
   // Clinic 2 Admin
-  { username: 'cadmin2', password: 'password', role: 'clinic_admin', clinicId: 'clinic-2', name: 'Bob Johnson (Manager)' },
+  { username: 'cadmin2', password: 'password', role: 'clinic_admin', clinicId: 'clinic-2', name: 'Priya Patel (Manager)', status: 'Active' },
   // Clinic 1 Staff
-  { username: 'staff1', password: 'password', role: 'staff', clinicId: 'clinic-1', name: 'Nurse Sarah Jenkins' },
+  { username: 'staff1', password: 'password', role: 'staff', clinicId: 'clinic-1', name: 'Nurse Sunita Nair', permissions: ['reception', 'finance'] },
+  { username: 'staff2', password: 'password', role: 'staff', clinicId: 'clinic-1', name: 'Amit Patel', permissions: ['reception'] },
   // Clinic 1 Doctors
   { 
     username: 'doctor1', 
     password: 'password', 
     role: 'doctor', 
     clinicId: 'clinic-1', 
-    name: 'Dr. Evelyn Martinez', 
+    name: 'Dr. Rajesh Iyer', 
     qualification: 'MD, FACP (Internal Medicine)', 
     designation: 'Senior Consultant Physician' 
   },
@@ -27,7 +52,7 @@ const INITIAL_USERS = [
     password: 'password', 
     role: 'doctor', 
     clinicId: 'clinic-1', 
-    name: 'Dr. Kenji Sato', 
+    name: 'Dr. Amit Verma', 
     qualification: 'MBBS, DLO (Otolaryngology)', 
     designation: 'ENT Specialist' 
   },
@@ -37,16 +62,21 @@ const INITIAL_USERS = [
     password: 'password', 
     role: 'doctor', 
     clinicId: 'clinic-2', 
-    name: 'Dr. Clara Oswald', 
+    name: 'Dr. Shalini Gupta', 
     qualification: 'DDS, Cosmetic Dentistry', 
     designation: 'Lead Dental Practitioner' 
   }
 ];
 
 const INITIAL_PATIENTS = [
-  { id: 'P-1001', clinicId: 'clinic-1', name: 'Jonathan Vance', age: 42, gender: 'Male', mobile: '9876543210', registeredAt: '2026-05-20' },
-  { id: 'P-1002', clinicId: 'clinic-1', name: 'Elizabeth Miller', age: 29, gender: 'Female', mobile: '9876543211', registeredAt: '2026-05-22' },
-  { id: 'P-1003', clinicId: 'clinic-2', name: 'Thomas Wayne', age: 55, gender: 'Male', mobile: '9876543212', registeredAt: '2026-05-24' }
+  { id: 'P-1001', clinicId: 'clinic-1', name: 'Jayesh Mehta', age: 42, gender: 'Male', mobile: '9876543210', registeredAt: '2026-05-20' },
+  { id: 'P-1002', clinicId: 'clinic-1', name: 'Ananya Iyer', age: 29, gender: 'Female', mobile: '9876543211', registeredAt: '2026-05-22' },
+  { id: 'P-1003', clinicId: 'clinic-2', name: 'Vikram Malhotra', age: 55, gender: 'Male', mobile: '9876543212', registeredAt: '2026-05-24' },
+  { id: 'P-1004', clinicId: 'clinic-1', name: 'Rahul Dravid', age: 45, gender: 'Male', mobile: '9876543220', registeredAt: '2026-05-25' },
+  { id: 'P-1005', clinicId: 'clinic-1', name: 'Kavita Reddy', age: 34, gender: 'Female', mobile: '9876543221', registeredAt: '2026-05-25' },
+  { id: 'P-1006', clinicId: 'clinic-1', name: 'Devendra Singh', age: 61, gender: 'Male', mobile: '9876543222', registeredAt: '2026-05-26' },
+  { id: 'P-1007', clinicId: 'clinic-1', name: 'Meera Deshmukh', age: 28, gender: 'Female', mobile: '9876543223', registeredAt: '2026-05-26' },
+  { id: 'P-1008', clinicId: 'clinic-1', name: 'Arjun Kapoor', age: 38, gender: 'Male', mobile: '9876543224', registeredAt: '2026-05-27' }
 ];
 
 const INITIAL_VITALS = [
@@ -76,7 +106,7 @@ const INITIAL_VITALS = [
 
 // Doctor configurations (isolated by doctorUsername)
 const INITIAL_TEMPLATES = [
-  // Dr. Evelyn Martinez (doctor1)
+  // Dr. Rajesh Iyer (doctor1)
   {
     id: 't1',
     doctorUsername: 'doctor1',
@@ -119,8 +149,8 @@ const INITIAL_TEMPLATES = [
     findingsDiagnosis: 'Atopic Dermatitis (Eczema)',
     prescriptionBody: 'CRM. Mometasone Furoate 0.1% -- Apply thin layer twice daily to affected areas -- 10 days\nTab. Cetirizine 10mg -- 1 tab daily at bedtime -- 15 days\nEmollient Moisturizer -- Apply liberally 3-4 times daily -- Ongoing'
   },
-
-  // Dr. Kenji Sato (doctor2)
+  
+  // Dr. Amit Verma (doctor2)
   {
     id: 't4',
     doctorUsername: 'doctor2',
@@ -208,3 +238,181 @@ window.INITIAL_TEMPLATES = INITIAL_TEMPLATES;
 window.INITIAL_DRUGS = INITIAL_DRUGS;
 window.INITIAL_TESTS = INITIAL_TESTS;
 window.INITIAL_ADVICE = INITIAL_ADVICE;
+
+// Seed Appointments with dynamic Indian names
+const INITIAL_APPOINTMENTS = [
+  { id: 'APT-1001', clinicId: 'clinic-1', patientId: 'P-1001', patientName: 'Jayesh Mehta', doctorUsername: 'doctor1', doctorName: 'Dr. Rajesh Iyer', date: '2026-05-27', time: '10:00 AM', type: 'Consultation', status: 'Scheduled', createdBy: 'staff1', createdAt: '2026-05-26T09:00:00Z' },
+  { id: 'APT-1002', clinicId: 'clinic-1', patientId: 'P-1002', patientName: 'Ananya Iyer', doctorUsername: 'doctor1', doctorName: 'Dr. Rajesh Iyer', date: '2026-05-27', time: '11:30 AM', type: 'Follow-up', status: 'Checked In', createdBy: 'staff1', createdAt: '2026-05-26T09:30:00Z' },
+  { id: 'APT-1003', clinicId: 'clinic-1', patientId: 'P-1001', patientName: 'Jayesh Mehta', doctorUsername: 'doctor2', doctorName: 'Dr. Amit Verma', date: '2026-05-25', time: '02:00 PM', type: 'Procedure', status: 'Completed', createdBy: 'staff1', createdAt: '2026-05-24T14:00:00Z' },
+  { id: 'APT-1004', clinicId: 'clinic-1', patientId: 'P-1004', patientName: 'Rahul Dravid', doctorUsername: 'doctor1', doctorName: 'Dr. Rajesh Iyer', date: '2026-05-26', time: '09:30 AM', type: 'Consultation', status: 'Completed', createdBy: 'staff1', createdAt: '2026-05-25T09:00:00Z' },
+  { id: 'APT-1005', clinicId: 'clinic-1', patientId: 'P-1005', patientName: 'Kavita Reddy', doctorUsername: 'doctor2', doctorName: 'Dr. Amit Verma', date: '2026-05-26', time: '11:00 AM', type: 'Consultation', status: 'Completed', createdBy: 'staff1', createdAt: '2026-05-25T11:00:00Z' },
+  { id: 'APT-1006', clinicId: 'clinic-1', patientId: 'P-1006', patientName: 'Devendra Singh', doctorUsername: 'doctor1', doctorName: 'Dr. Rajesh Iyer', date: '2026-05-27', time: '02:30 PM', type: 'Consultation', status: 'Scheduled', createdBy: 'staff2', createdAt: '2026-05-27T08:30:00Z' },
+  { id: 'APT-1007', clinicId: 'clinic-1', patientId: 'P-1007', patientName: 'Meera Deshmukh', doctorUsername: 'doctor2', doctorName: 'Dr. Amit Verma', date: '2026-05-27', time: '03:00 PM', type: 'Procedure', status: 'Scheduled', createdBy: 'staff2', createdAt: '2026-05-27T08:45:00Z' },
+  { id: 'APT-1008', clinicId: 'clinic-1', patientId: 'P-1008', patientName: 'Arjun Kapoor', doctorUsername: 'doctor1', doctorName: 'Dr. Rajesh Iyer', date: '2026-05-27', time: '04:00 PM', type: 'Follow-up', status: 'Cancelled', createdBy: 'staff1', createdAt: '2026-05-27T09:00:00Z' },
+  { id: 'APT-1009', clinicId: 'clinic-2', patientId: 'P-1003', patientName: 'Vikram Malhotra', doctorUsername: 'doctor3', doctorName: 'Dr. Shalini Gupta', date: '2026-05-27', time: '10:30 AM', type: 'Consultation', status: 'Scheduled', createdBy: 'cadmin2', createdAt: '2026-05-27T09:00:00Z' },
+  { id: 'APT-1010', clinicId: 'clinic-2', patientId: 'P-1003', patientName: 'Vikram Malhotra', doctorUsername: 'doctor3', doctorName: 'Dr. Shalini Gupta', date: '2026-05-26', time: '11:00 AM', type: 'Consultation', status: 'Completed', createdBy: 'cadmin2', createdAt: '2026-05-25T15:00:00Z' }
+];
+
+// Rich Bills Dataset spanning different dates, payment modes, and doctors
+const INITIAL_BILLS = [
+  { 
+    id: 'INV-1001', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1001', 
+    patientName: 'Jayesh Mehta', 
+    doctorUsername: 'doctor2', 
+    doctorName: 'Dr. Amit Verma', 
+    items: [{ description: 'ENT Consultation Fee', amount: 500 }, { description: 'Ear Syringing', amount: 800 }], 
+    subtotal: 1300, 
+    discount: 100, 
+    tax: 60, 
+    total: 1260, 
+    amountPaid: 1260, 
+    paymentStatus: 'Paid', 
+    paymentMode: 'Cash', 
+    createdBy: 'staff1', 
+    createdAt: '2026-05-25T14:45:00Z' 
+  },
+  { 
+    id: 'INV-1002', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1002', 
+    patientName: 'Ananya Iyer', 
+    doctorUsername: 'doctor1', 
+    doctorName: 'Dr. Rajesh Iyer', 
+    items: [{ description: 'General Consultation', amount: 400 }, { description: 'Blood Sugar Test', amount: 150 }], 
+    subtotal: 550, 
+    discount: 0, 
+    tax: 0, 
+    total: 550, 
+    amountPaid: 0, 
+    paymentStatus: 'Pending', 
+    paymentMode: 'Insurance', 
+    insuranceClaimId: 'CLM-1001', 
+    createdBy: 'staff1', 
+    createdAt: '2026-05-27T10:15:00Z' 
+  },
+  { 
+    id: 'INV-1003', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1004', 
+    patientName: 'Rahul Dravid', 
+    doctorUsername: 'doctor1', 
+    doctorName: 'Dr. Rajesh Iyer', 
+    items: [{ description: 'General Consultation', amount: 400 }, { description: 'ECG Test', amount: 600 }], 
+    subtotal: 1000, 
+    discount: 0, 
+    tax: 0, 
+    total: 1000, 
+    amountPaid: 1000, 
+    paymentStatus: 'Paid', 
+    paymentMode: 'Card', 
+    createdBy: 'staff1', 
+    createdAt: '2026-05-26T09:45:00Z' 
+  },
+  { 
+    id: 'INV-1004', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1005', 
+    patientName: 'Kavita Reddy', 
+    doctorUsername: 'doctor2', 
+    doctorName: 'Dr. Amit Verma', 
+    items: [{ description: 'ENT Consultation Fee', amount: 500 }, { description: 'Nasal Endoscopy', amount: 1500 }], 
+    subtotal: 2000, 
+    discount: 0, 
+    tax: 0, 
+    total: 2000, 
+    amountPaid: 2000, 
+    paymentStatus: 'Paid', 
+    paymentMode: 'UPI', 
+    createdBy: 'staff1', 
+    createdAt: '2026-05-26T11:20:00Z' 
+  },
+  { 
+    id: 'INV-1005', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1006', 
+    patientName: 'Devendra Singh', 
+    doctorUsername: 'doctor1', 
+    doctorName: 'Dr. Rajesh Iyer', 
+    items: [{ description: 'Senior Consultation', amount: 500 }, { description: 'CBC Blood Panel', amount: 800 }], 
+    subtotal: 1300, 
+    discount: 0, 
+    tax: 0, 
+    total: 1300, 
+    amountPaid: 1300, 
+    paymentStatus: 'Paid', 
+    paymentMode: 'Cash', 
+    createdBy: 'staff2', 
+    createdAt: '2026-05-27T13:00:00Z' 
+  },
+  { 
+    id: 'INV-1006', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1007', 
+    patientName: 'Meera Deshmukh', 
+    doctorUsername: 'doctor2', 
+    doctorName: 'Dr. Amit Verma', 
+    items: [{ description: 'ENT Consultation Fee', amount: 500 }], 
+    subtotal: 500, 
+    discount: 0, 
+    tax: 0, 
+    total: 500, 
+    amountPaid: 0, 
+    paymentStatus: 'Pending', 
+    paymentMode: 'UPI', 
+    createdBy: 'staff2', 
+    createdAt: '2026-05-27T14:30:00Z' 
+  },
+  { 
+    id: 'INV-1007', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1002', 
+    patientName: 'Ananya Iyer', 
+    doctorUsername: 'doctor1', 
+    doctorName: 'Dr. Rajesh Iyer', 
+    items: [{ description: 'General Consultation', amount: 400 }], 
+    subtotal: 400, 
+    discount: 0, 
+    tax: 0, 
+    total: 400, 
+    amountPaid: 400, 
+    paymentStatus: 'Paid', 
+    paymentMode: 'Card', 
+    createdBy: 'staff1', 
+    createdAt: '2026-04-15T10:00:00Z' 
+  },
+  { 
+    id: 'INV-1008', 
+    clinicId: 'clinic-1', 
+    patientId: 'P-1001', 
+    patientName: 'Jayesh Mehta', 
+    doctorUsername: 'doctor1', 
+    doctorName: 'Dr. Rajesh Iyer', 
+    items: [{ description: 'General Consultation', amount: 400 }, { description: 'Blood Test', amount: 300 }], 
+    subtotal: 700, 
+    discount: 0, 
+    tax: 0, 
+    total: 700, 
+    amountPaid: 700, 
+    paymentStatus: 'Paid', 
+    paymentMode: 'UPI', 
+    createdBy: 'staff1', 
+    createdAt: '2025-12-10T11:00:00Z' 
+  }
+];
+
+const INITIAL_INSURANCE = [
+  { id: 'INS-1001', clinicId: 'clinic-1', patientId: 'P-1002', provider: 'Star Health Insurance', policyNumber: 'SH-9837482-A', coverageAmount: 50000, claimId: 'CLM-1001', claimAmount: 550, claimStatus: 'Pending Approval', updatedAt: '2026-05-27T10:15:00Z' }
+];
+
+const INITIAL_ATTENDANCE = [
+  { id: 'ATT-1001', clinicId: 'clinic-1', username: 'staff1', name: 'Nurse Sunita Nair', loginTime: '2026-05-26T08:00:00Z', logoutTime: '2026-05-26T16:30:00Z', date: '2026-05-26' },
+  { id: 'ATT-1002', clinicId: 'clinic-1', username: 'staff1', name: 'Nurse Sunita Nair', loginTime: '2026-05-27T08:00:00Z', logoutTime: null, date: '2026-05-27' },
+  { id: 'ATT-1003', clinicId: 'clinic-1', username: 'staff2', name: 'Amit Patel', loginTime: '2026-05-27T09:00:00Z', logoutTime: '2026-05-27T17:00:00Z', date: '2026-05-27' }
+];
+
+window.INITIAL_APPOINTMENTS = INITIAL_APPOINTMENTS;
+window.INITIAL_BILLS = INITIAL_BILLS;
+window.INITIAL_INSURANCE = INITIAL_INSURANCE;
+window.INITIAL_ATTENDANCE = INITIAL_ATTENDANCE;

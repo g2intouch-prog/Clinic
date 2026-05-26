@@ -43,13 +43,15 @@
         <span id="db-status-text">Detecting Storage...</span>
       </div>
 
+      <!-- Weekly Duty Schedule Button -->
+      <button class="btn btn-secondary btn-sm" id="view-schedule-btn" onclick="openViewScheduleModal()" style="margin-right:0.25rem;">📅 Weekly Schedule</button>
       <!-- Theme Switcher -->
       <button class="btn btn-secondary btn-sm" id="theme-toggle-btn" title="Toggle Light/Dark Theme">🌓 Theme</button>
 
       <!-- Active Logged In Account Summary -->
       <div class="nav-user">
         <span class="user-badge" id="nav-user-role">Doctor</span>
-        <strong id="nav-user-name">Dr. Evelyn Martinez</strong>
+        <strong id="nav-user-name">Dr. Rajesh Iyer</strong>
       </div>
       
       <button class="btn btn-secondary btn-sm btn-danger" id="logout-btn">Log Out</button>
@@ -107,7 +109,10 @@
   <main class="dashboard-container hidden" id="view-admin">
     <div class="section-header">
       <h2>Super Administrator System Dashboard</h2>
-      <button class="btn btn-primary" id="admin-add-clinic-btn">+ Register New Clinic</button>
+      <div style="display:flex; gap:0.75rem;">
+        <button class="btn btn-primary" id="admin-add-clinic-btn">+ Register New Clinic</button>
+        <button class="btn btn-primary" id="admin-add-cadmin-btn" style="background-color: var(--admin-color); color: #000;">+ Register Clinic Admin</button>
+      </div>
     </div>
 
     <!-- System Stats -->
@@ -128,8 +133,15 @@
       </div>
     </div>
 
+    <!-- Tab Selection -->
+    <div class="dashboard-tabs" style="display:flex; gap:1rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; margin-bottom:1rem;">
+      <button class="btn btn-secondary active" id="btn-admin-tab-clinics" onclick="switchSuperAdminTab('clinics')">🏢 Clinics Directory</button>
+      <button class="btn btn-secondary" id="btn-admin-tab-admins" onclick="switchSuperAdminTab('admins')">🏥 Clinic Administrators</button>
+      <button class="btn btn-secondary" id="btn-admin-tab-payments" onclick="switchSuperAdminTab('payments')">💰 Payments & Ratings</button>
+    </div>
+
     <!-- Clinic Registry list -->
-    <div class="glass-panel">
+    <div id="panel-admin-clinics" class="glass-panel">
       <h3 style="margin-bottom: 1rem;">Registered Medical Clinics Directory</h3>
       <div class="table-wrapper">
         <table class="custom-table" id="clinics-table">
@@ -138,6 +150,49 @@
               <th>Clinic ID</th>
               <th>Clinic Name</th>
               <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Clinic Admins list -->
+    <div id="panel-admin-admins" class="glass-panel hidden">
+      <h3 style="margin-bottom: 1rem;">Clinic Administrators Accounts</h3>
+      <div class="table-wrapper">
+        <table class="custom-table" id="admins-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Name</th>
+              <th>Assigned Clinic</th>
+              <th>Subscription Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Clinic Payments list -->
+    <div id="panel-admin-payments" class="glass-panel hidden">
+      <h3 style="margin-bottom: 1rem;">Clinics Billing Directory & Ratings</h3>
+      <div class="table-wrapper">
+        <table class="custom-table" id="clinic-payments-table">
+          <thead>
+            <tr>
+              <th>Clinic Name</th>
+              <th>Billing Model</th>
+              <th>Pricing Rate</th>
+              <th>Outstanding Unpaid Dues</th>
+              <th>Payment Reliability Rating</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -158,27 +213,25 @@
         <h2 id="clinic-admin-title">Facility Configuration Console</h2>
         <p class="text-muted" id="clinic-admin-subtitle">Clinic Scoped Operations</p>
       </div>
-      <button class="btn btn-primary" id="cadmin-add-user-btn">+ Add Clinic User Profile</button>
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">🩺</div>
-        <div class="stat-info">
-          <h3 id="cadmin-stat-doctors">0</h3>
-          <p>Doctors Staffed</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">👥</div>
-        <div class="stat-info">
-          <h3 id="cadmin-stat-staff">0</h3>
-          <p>Nurses & Receptionists</p>
-        </div>
+      <div style="display:flex; gap:0.5rem;">
+        <button class="btn btn-secondary" onclick="openViewScheduleModal()" style="background-color: var(--accent-color); color: #000; font-weight:600;">📅 Manage Schedule</button>
+        <button class="btn btn-secondary" onclick="triggerChatAuditAuth()" style="background-color: var(--staff-color); color: #fff; font-weight:600;">📂 Chat Archive</button>
+        <button class="btn btn-primary" id="cadmin-add-user-btn">+ Add Clinic User Profile</button>
       </div>
     </div>
 
-    <div class="form-row">
+    <!-- Clinic Admin Dashboard Tabs -->
+    <div class="dashboard-tabs" style="display:flex; flex-wrap:wrap; gap:0.5rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; margin-bottom:1.5rem;">
+      <button class="btn btn-secondary active" id="btn-cadmin-tab-users" onclick="switchCadminTab('users')">👥 Users & Settings</button>
+      <button class="btn btn-secondary" id="btn-cadmin-tab-apts" onclick="switchCadminTab('apts')">📅 Appointments Queue</button>
+      <button class="btn btn-secondary" id="btn-cadmin-tab-apt-billing" onclick="switchCadminTab('apt-billing')">💰 Appointments Payments</button>
+      <button class="btn btn-secondary" id="btn-cadmin-tab-finance" onclick="switchCadminTab('finance')">💰 Financial Reports</button>
+      <button class="btn btn-secondary" id="btn-cadmin-tab-attendance" onclick="switchCadminTab('attendance')">🕒 Attendance Logs</button>
+      <button class="btn btn-secondary" id="btn-cadmin-tab-performance" onclick="switchCadminTab('performance')">📈 Performance Reports</button>
+    </div>
+
+    <!-- Panel 1: Users & Settings -->
+    <div id="panel-cadmin-users" class="form-row">
       <!-- Left side: User Management -->
       <div class="glass-panel" style="flex: 2;">
         <h3 style="margin-bottom: 1rem;">Clinic User Accounts Registry</h3>
@@ -189,6 +242,7 @@
                 <th>Username</th>
                 <th>Full Name</th>
                 <th>Access Level</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -217,35 +271,336 @@
         </div>
       </div>
     </div>
-  </main>
 
-  <!-- ============================================
-       4. STAFF (RECEPTIONIST / NURSE) VIEW PORTAL
-       ============================================ -->
-  <main class="dashboard-container hidden" id="view-staff">
-    <div class="section-header">
-      <h2>Staff Reception Desk & Vitals Intake</h2>
-      <button class="btn btn-primary" id="staff-add-patient-btn">+ Register New Patient</button>
-    </div>
-
-    <div class="glass-panel">
-      <h3 style="margin-bottom: 1rem;">Patient Demographics & Medical Intake Queue</h3>
+    <!-- Panel 2: Appointments Overview -->
+    <div id="panel-cadmin-apts" class="glass-panel hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
+        <h3>Appointments Queue & Schedules</h3>
+        <!-- Filters -->
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+          <input type="text" id="cadmin-apt-search-input" class="form-control" style="width:auto; padding:0.4rem 0.8rem;" placeholder="Search patient or ID...">
+          <input type="date" id="cadmin-apt-filter-date" class="form-control" style="width:auto; padding:0.4rem 0.8rem;" onchange="renderCadminAppointments()">
+          <select id="cadmin-apt-filter-doctor" class="form-control" style="width:auto; padding:0.4rem 0.8rem;" onchange="renderCadminAppointments()">
+            <option value="All">All Doctors</option>
+          </select>
+          <select id="cadmin-apt-filter-status" class="form-control" style="width:auto; padding:0.4rem 0.8rem;" onchange="renderCadminAppointments()">
+            <option value="All">All Statuses</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Checked In">Checked In</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
       <div class="table-wrapper">
-        <table class="custom-table" id="patients-table">
+        <table class="custom-table" id="cadmin-apts-table">
           <thead>
             <tr>
-              <th>Patient ID</th>
-              <th>Full Name</th>
-              <th>Age & Gender</th>
-              <th>Mobile</th>
-              <th>Vitals Recorded</th>
-              <th>Actions</th>
+              <th>Appt ID</th>
+              <th>Patient</th>
+              <th>Assigned Doctor</th>
+              <th>Schedule Details</th>
+              <th>Type</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             <!-- Dynamic Injection -->
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Panel 3: Financial Analytics -->
+    <div id="panel-cadmin-finance" class="glass-panel hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+        <h3>Clinic Revenue & Billing Analytics</h3>
+        <!-- Filters -->
+        <div style="display:flex; gap:0.25rem;" class="period-selectors">
+          <button class="btn btn-secondary btn-sm active" id="f-period-day" onclick="setFinancePeriod('day')">Day</button>
+          <button class="btn btn-secondary btn-sm" id="f-period-week" onclick="setFinancePeriod('week')">Week</button>
+          <button class="btn btn-secondary btn-sm" id="f-period-month" onclick="setFinancePeriod('month')">Month</button>
+          <button class="btn btn-secondary btn-sm" id="f-period-year" onclick="setFinancePeriod('year')">Year</button>
+          <button class="btn btn-secondary btn-sm" id="f-period-all" onclick="setFinancePeriod('all')">Till Date</button>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-grid" style="margin-bottom:1.5rem;">
+        <div class="stat-card" style="border-left:4px solid var(--cadmin-color);">
+          <div class="stat-icon">🧾</div>
+          <div class="stat-info">
+            <h3 id="f-stat-billed">₹0</h3>
+            <p>Total Revenue Billed</p>
+          </div>
+        </div>
+        <div class="stat-card" style="border-left:4px solid var(--success);">
+          <div class="stat-icon">💰</div>
+          <div class="stat-info">
+            <h3 id="f-stat-collected">₹0</h3>
+            <p>Total Revenue Collected</p>
+          </div>
+        </div>
+        <div class="stat-card" style="border-left:4px solid var(--warning);">
+          <div class="stat-icon">⌛</div>
+          <div class="stat-info">
+            <h3 id="f-stat-outstanding">₹0</h3>
+            <p>Total Outstanding (Pending)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment Breakdown charts (CSS meters) -->
+      <div class="form-row">
+        <div class="glass-panel" style="background:var(--bg-surface-elevated); padding:1.5rem; flex:1;">
+          <h4 style="margin-bottom:1rem;">Payment Method Distribution</h4>
+          <div style="display:flex; flex-direction:column; gap:1rem;" id="payment-mode-breakdown">
+            <!-- Dynamic Injection -->
+          </div>
+        </div>
+        <div class="glass-panel" style="background:var(--bg-surface-elevated); padding:1.5rem; flex:1;">
+          <h4 style="margin-bottom:1rem;">Billing Category Breakdown</h4>
+          <div style="display:flex; flex-direction:column; gap:1rem;" id="billing-type-breakdown">
+            <!-- Dynamic Injection -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 4: Attendance Monitoring -->
+    <div id="panel-cadmin-attendance" class="glass-panel hidden">
+      <h3 style="margin-bottom: 1rem;">Staff Shift & Login Attendance Registry</h3>
+      <div class="table-wrapper">
+        <table class="custom-table" id="cadmin-attendance-table">
+          <thead>
+            <tr>
+              <th>Log ID</th>
+              <th>Staff Username</th>
+              <th>Full Name</th>
+              <th>Shift Login Time</th>
+              <th>Shift Logout Time</th>
+              <th>Active Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel 5: Performance Reports -->
+    <div id="panel-cadmin-performance" class="form-row hidden">
+      <!-- Left side: Staff Performance -->
+      <div class="glass-panel" style="flex: 1; min-width: 320px;">
+        <h3 style="margin-bottom: 1rem;">Staff Desk Activity Performance</h3>
+        <div class="table-wrapper">
+          <table class="custom-table" id="cadmin-staff-performance-table">
+            <thead>
+              <tr>
+                <th>Staff Name</th>
+                <th>Appts Booked</th>
+                <th>Invoices Generated</th>
+                <th>Revenue Processed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dynamic Injection -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right side: Doctors Performance -->
+      <div class="glass-panel" style="flex: 1; min-width: 320px;">
+        <h3 style="margin-bottom: 1rem;">Medical Practitioner Performance</h3>
+        <div class="table-wrapper">
+          <table class="custom-table" id="cadmin-doc-performance-table">
+            <thead>
+              <tr>
+                <th>Doctor Name</th>
+                <th>Patients Attended</th>
+                <th>Consultation Revenue</th>
+                <th>Procedure/Extra Revenue</th>
+                <th>Total Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dynamic Injection -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 6: Appointments Billing & Payments Status -->
+    <div id="panel-cadmin-apt-billing" class="glass-panel hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+        <h3>Appointments Billing & Payment Status</h3>
+        <!-- Filters -->
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+          <input type="text" id="cadmin-apt-billing-search-input" class="form-control" style="width:auto; padding:0.4rem 0.8rem;" placeholder="Search patient or ID...">
+          <select id="cadmin-apt-billing-filter-payment" class="form-control" style="width:auto; padding:0.4rem 0.8rem;" onchange="renderCadminAppointmentsBilling()">
+            <option value="All">All Payment Statuses</option>
+            <option value="Paid">Paid</option>
+            <option value="Pending">Payment Due (Pending)</option>
+            <option value="Prepaid">Prepaid</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="custom-table" id="cadmin-apt-billing-table">
+          <thead>
+            <tr>
+              <th>Appt ID</th>
+              <th>Patient</th>
+              <th>Date & Time</th>
+              <th>Doctor</th>
+              <th>Invoice ID</th>
+              <th>Bill Total</th>
+              <th>Paid Amount</th>
+              <th>Payment Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================
+       4. STAFF (RECEPTIONIST / NURSE) VIEW PORTAL
+       ============================================ -->
+  <main class="dashboard-container hidden" id="view-staff">
+    <!-- Staff Authorization Tab Bar -->
+    <div class="dashboard-tabs hidden" id="staff-tabs" style="display:flex; gap:1rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem; margin-bottom:1.5rem;">
+      <button class="btn btn-secondary active" id="btn-staff-tab-reception" onclick="switchStaffTab('reception')">📋 Reception & Appointments</button>
+      <button class="btn btn-secondary" id="btn-staff-tab-finance" onclick="switchStaffTab('finance')">💳 Financial & Insurance</button>
+    </div>
+
+    <!-- Panel A: Reception & Appointments -->
+    <div id="panel-staff-reception">
+      <div class="section-header">
+        <h2>Reception Desk & Vitals Intake</h2>
+        <button class="btn btn-primary" id="staff-add-patient-btn">+ Register New Patient</button>
+      </div>
+
+      <div class="glass-panel" style="margin-bottom:2rem;">
+        <h3 style="margin-bottom: 1rem;">Patient Demographics & Medical Intake Queue</h3>
+        
+        <!-- Search bar widget -->
+        <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap; max-width:600px;">
+          <input type="text" id="staff-patient-search-input" class="form-control" style="flex:2; min-width:200px;" placeholder="Search by Patient ID, Name, or Mobile Number...">
+          <button class="btn btn-primary btn-sm" style="padding:0.4rem 1rem;" onclick="searchStaffPatients()">🔍 Search</button>
+          <button class="btn btn-secondary btn-sm" style="padding:0.4rem 1rem;" onclick="resetStaffPatientsSearch()">Reset</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="custom-table" id="patients-table">
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Full Name</th>
+                <th>Age & Gender</th>
+                <th>Mobile</th>
+                <th>Vitals Recorded</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dynamic Injection -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Appointments Scheduling Desk -->
+      <div class="glass-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
+          <h3>Appointment Schedule Desk</h3>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <select id="staff-apt-doctor-filter" class="form-control" style="width:auto; padding:0.4rem 0.8rem;" onchange="loadAppointments()">
+              <option value="All">All Doctors</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="staff-book-apt-btn" style="background-color: var(--accent-color); color: #000;">+ Book Appointment</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="custom-table" id="staff-appointments-table">
+            <thead>
+              <tr>
+                <th>Appt ID</th>
+                <th>Patient</th>
+                <th>Doctor</th>
+                <th>Date & Time</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dynamic Injection -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel B: Financial Desk -->
+    <div id="panel-staff-finance" class="hidden">
+      <div class="section-header">
+        <h2>Billing Operations & Insurance Desk</h2>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-primary" id="staff-add-bill-btn" style="background-color: var(--success); color: #000;">+ Generate Invoice</button>
+          <button class="btn btn-primary" id="staff-add-insurance-btn" style="background-color: var(--staff-color); color: #000;">+ Register Insurance Policy</button>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <!-- Billing Desk -->
+        <div class="glass-panel" style="flex:2; min-width: 320px;">
+          <h3 style="margin-bottom: 1rem;">Past Billing Invoices</h3>
+          <div class="table-wrapper">
+            <table class="custom-table" id="staff-bills-table">
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Patient Name</th>
+                  <th>Total Amount</th>
+                  <th>Payment Status</th>
+                  <th>Payment Mode</th>
+                  <th>Date & Doctor</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Dynamic Injection -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Insurance Center -->
+        <div class="glass-panel" style="flex:1; min-width: 320px;">
+          <h3 style="margin-bottom: 1rem;">Insurance Policy & Claim Registry</h3>
+          <div class="table-wrapper">
+            <table class="custom-table" id="staff-insurance-table">
+              <thead>
+                <tr>
+                  <th>Patient ID</th>
+                  <th>Insurance Policy Details</th>
+                  <th>Claim Details</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Dynamic Injection -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -600,6 +955,21 @@
             </select>
           </div>
           
+          <!-- Staff Custom Permissions Fields -->
+          <div id="staff-permission-fields">
+            <div class="form-group">
+              <label>Staff Permission Authorizations</label>
+              <div style="display:flex; gap:1.5rem; margin-top:0.25rem;">
+                <label style="display:inline-flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+                  <input type="checkbox" id="user-perm-reception" value="reception" checked> Reception Desk
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:0.5rem; font-weight:normal; cursor:pointer;">
+                  <input type="checkbox" id="user-perm-finance" value="finance" checked> Financial Desk
+                </label>
+              </div>
+            </div>
+          </div>
+          
           <!-- Doctor Custom Meta Fields -->
           <div id="doctor-custom-fields" class="hidden">
             <div class="form-group">
@@ -791,6 +1161,533 @@
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-doctor-item')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Config Item</button>
         </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-clinic-admin: Super Admin Clinic Admin Modal -->
+  <div class="modal-backdrop hidden" id="modal-clinic-admin">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="cadmin-modal-title">Register New Clinic Admin</h3>
+        <button class="modal-close" onclick="closeModal('modal-clinic-admin')">&times;</button>
+      </div>
+      <form id="cadmin-user-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="cadmin-form-username">Username</label>
+            <input type="text" id="cadmin-form-username" class="form-control" required placeholder="e.g. city_manager">
+          </div>
+          <div class="form-group">
+            <label for="cadmin-form-password">Password</label>
+            <input type="password" id="cadmin-form-password" class="form-control" required placeholder="••••••••" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="cadmin-form-name">Full Name</label>
+            <input type="text" id="cadmin-form-name" class="form-control" required placeholder="e.g. Alice Smith">
+          </div>
+          <div class="form-group">
+            <label for="cadmin-form-clinic">Assigned Clinic</label>
+            <select id="cadmin-form-clinic" class="form-control" required>
+              <!-- Dynamic clinics dropdown -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cadmin-form-status">Account Subscription Status</label>
+            <select id="cadmin-form-status" class="form-control">
+              <option value="Active">Active / Subscribed</option>
+              <option value="Suspended">Suspended</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-clinic-admin')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Admin Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-book-appointment: Staff Appointment Booking Modal -->
+  <div class="modal-backdrop hidden" id="modal-book-appointment">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="appointment-modal-title">Book Patient Appointment</h3>
+        <button class="modal-close" onclick="closeModal('modal-book-appointment')">&times;</button>
+      </div>
+      <form id="appointment-form">
+        <div class="modal-body">
+          <input type="hidden" id="appointment-form-id">
+          <div class="form-group">
+            <label for="appointment-form-patient">Select Patient</label>
+            <select id="appointment-form-patient" class="form-control" required>
+              <!-- Dynamic Patients list -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="appointment-form-doctor">Select Treating Doctor</label>
+            <select id="appointment-form-doctor" class="form-control" required>
+              <!-- Dynamic Doctors list -->
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="appointment-form-date">Appointment Date</label>
+              <input type="date" id="appointment-form-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+               <label for="appointment-form-time">Time Slot</label>
+               <select id="appointment-form-time" class="form-control" required>
+                 <option value="09:00 AM">09:00 AM</option>
+                 <option value="09:30 AM">09:30 AM</option>
+                 <option value="10:00 AM">10:00 AM</option>
+                 <option value="10:30 AM">10:30 AM</option>
+                 <option value="11:00 AM">11:00 AM</option>
+                 <option value="11:30 AM">11:30 AM</option>
+                 <option value="12:00 PM">12:00 PM</option>
+                 <option value="12:30 PM">12:30 PM</option>
+                 <option value="02:00 PM">02:00 PM</option>
+                 <option value="02:30 PM">02:30 PM</option>
+                 <option value="03:00 PM">03:00 PM</option>
+                 <option value="03:30 PM">03:30 PM</option>
+                 <option value="04:00 PM">04:00 PM</option>
+                 <option value="04:30 PM">04:30 PM</option>
+               </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="appointment-form-type">Appointment Type</label>
+            <select id="appointment-form-type" class="form-control">
+              <option value="Consultation">General Consultation</option>
+              <option value="Follow-up">Routine Follow-up</option>
+              <option value="Procedure">Special Procedure</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-book-appointment')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Schedule Appointment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-create-bill: Staff Invoice Generation Modal -->
+  <div class="modal-backdrop hidden" id="modal-create-bill">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3>Generate Billing Invoice</h3>
+        <button class="modal-close" onclick="closeModal('modal-create-bill')">&times;</button>
+      </div>
+      <form id="bill-form">
+        <div class="modal-body">
+          <input type="hidden" id="bill-form-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="bill-form-patient">Select Patient</label>
+              <select id="bill-form-patient" class="form-control" required onchange="onBillPatientChange()">
+                <!-- Dynamic Patients -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="bill-form-doctor">Select Treating Doctor</label>
+              <select id="bill-form-doctor" class="form-control" required>
+                <!-- Dynamic Doctors -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Invoice Line Items</label>
+            <div id="bill-items-container" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem;">
+              <!-- Added items will appear here -->
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" id="bill-item-desc" class="form-control" placeholder="Item description (e.g. Consult, CBC test)" style="flex:2;">
+              <input type="number" id="bill-item-amt" class="form-control" placeholder="Amount (₹)" style="flex:1;" min="0">
+              <button type="button" class="btn btn-secondary" onclick="addBillLineItem()">+ Add Item</button>
+            </div>
+          </div>
+
+          <div class="form-row" style="border-top:1px dashed var(--border-color); padding-top:1rem; margin-top:1rem;">
+            <div class="form-group">
+              <label for="bill-form-discount">Discount (₹)</label>
+               <input type="number" id="bill-form-discount" class="form-control" value="0" min="0" oninput="calculateBillTotals()">
+            </div>
+            <div class="form-group">
+              <label for="bill-form-tax">Tax (GST) (₹)</label>
+              <input type="number" id="bill-form-tax" class="form-control" value="0" min="0" oninput="calculateBillTotals()">
+            </div>
+          </div>
+
+          <div style="background:var(--bg-surface-elevated); padding:1rem; border-radius:var(--radius-sm); margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+            <span>Subtotal: <strong id="bill-subtotal-disp">₹0</strong></span>
+            <span>Total Due: <strong id="bill-total-disp" style="font-size:1.2rem; color:var(--success);">₹0</strong></span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="bill-form-mode">Payment Mode</label>
+              <select id="bill-form-mode" class="form-control">
+                <option value="Cash">Cash Payment</option>
+                <option value="Card">Credit/Debit Card</option>
+                <option value="UPI">UPI / Digital Scan</option>
+                <option value="Insurance">Insurance Claim Co-Pay</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="bill-form-status">Payment Status</label>
+              <select id="bill-form-status" class="form-control">
+                <option value="Paid">Fully Paid</option>
+                <option value="Pending">Pending (Outstanding)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-bill')">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background-color: var(--success); color:#000;">Save & Issue Invoice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-patient-insurance: Link Patient Policy -->
+  <div class="modal-backdrop hidden" id="modal-patient-insurance">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Register Patient Insurance Policy</h3>
+        <button class="modal-close" onclick="closeModal('modal-patient-insurance')">&times;</button>
+      </div>
+      <form id="insurance-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="insurance-form-patient">Select Patient</label>
+            <select id="insurance-form-patient" class="form-control" required>
+              <!-- Dynamic patients -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="insurance-form-provider">Insurance Provider Name</label>
+            <input type="text" id="insurance-form-provider" class="form-control" required placeholder="e.g. Star Health, Blue Cross">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="insurance-form-policy">Policy Number</label>
+              <input type="text" id="insurance-form-policy" class="form-control" required placeholder="e.g. IN-938472">
+            </div>
+            <div class="form-group">
+              <label for="insurance-form-coverage">Total Coverage (₹)</label>
+              <input type="number" id="insurance-form-coverage" class="form-control" required placeholder="500000" min="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-patient-insurance')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Link Insurance Policy</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-invoice-detail: Print receipt preview -->
+  <div class="modal-backdrop hidden" id="modal-invoice-detail">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>Invoice Receipt Preview</h3>
+        <button class="modal-close" onclick="closeModal('modal-invoice-detail')">&times;</button>
+      </div>
+      <div class="modal-body" style="background:#f8fafc; padding:1.5rem;">
+        <div id="invoice-receipt-print-area" style="background:#ffffff; color:#000000; padding:1.5rem; font-family:monospace; font-size:10pt; line-height:1.4; border:1px solid #cbd5e1; border-radius:4px;">
+          <!-- Dynamic invoice contents -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-invoice-detail')">Close</button>
+        <button type="button" class="btn btn-primary" onclick="printInvoiceReceipt()" style="background-color:var(--success); color:#000;">Print Receipt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-clinic-payment-history: Super Admin Clinic Invoices and Rating History -->
+  <div class="modal-backdrop hidden" id="modal-clinic-payment-history">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3 id="clinic-payment-history-title">Clinic Payment History</h3>
+        <button class="modal-close" onclick="closeModal('modal-clinic-payment-history')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:var(--bg-surface-elevated); padding:1rem; border-radius:var(--radius-sm); margin-bottom:1rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+          <div>
+            Billing Model: <strong id="cpay-detail-model">-</strong><br>
+            Rate Structure: <strong id="cpay-detail-rate">-</strong>
+          </div>
+          <div>
+            Outstanding Unpaid: <strong id="cpay-detail-dues" style="color:var(--error);">-</strong><br>
+            Current Rating Score: <strong id="cpay-detail-rating" style="color:var(--warning);">-</strong>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="custom-table" id="clinic-invoices-table">
+            <thead>
+              <tr>
+                <th>Invoice Date</th>
+                <th>Patient Count (Metric)</th>
+                <th>Amount Due</th>
+                <th>Paid Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dynamic monthly invoices -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-clinic-payment-history')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-duty-schedule-view: View/Manage Weekly Duty & Shift Schedule -->
+  <div class="modal-backdrop hidden" id="modal-duty-schedule-view" style="z-index: 1000;">
+    <div class="modal-content" style="max-width: 900px; width: 95%;">
+      <div class="modal-header">
+        <h3 id="schedule-title">📅 Duty & Shift Calendar</h3>
+        <button class="modal-close" onclick="closeModal('modal-duty-schedule-view')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Management Tools for Cadmin -->
+        <div id="cadmin-schedule-tools" class="hidden" style="margin-bottom:1rem; display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:space-between; align-items:center;">
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" class="btn btn-primary" onclick="addNewShiftColumn()" style="background-color: var(--cadmin-color); color:#000; font-weight:600;">+ Add Shift Column</button>
+            <button type="button" class="btn btn-secondary" onclick="addNewDateRow()" style="font-weight:600;">+ Add Date Row</button>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">Click cells/headers to edit. Changes auto-save.</p>
+        </div>
+        
+        <div class="table-wrapper" style="overflow-x:auto;">
+          <table class="custom-table" id="schedule-calendar-table">
+            <thead>
+              <!-- Dynamically populated -->
+            </thead>
+            <tbody>
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-duty-schedule-view')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-cell-view: Pop-up view of a cell's scheduled staff -->
+  <div class="modal-backdrop hidden" id="modal-cell-view" style="z-index: 1100;">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3 id="cell-view-title">Shift Roster</h3>
+        <button class="modal-close" onclick="closeModal('modal-cell-view')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem;">
+        <div style="margin-bottom:1rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Date / Day</span>
+          <div id="cell-view-date" style="font-size:1.1rem; font-weight:600; margin-top:0.25rem;"></div>
+        </div>
+        <div style="margin-bottom:1.5rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Shift Name</span>
+          <div id="cell-view-shift" style="font-size:1.1rem; font-weight:600; margin-top:0.25rem; color:var(--accent-color);"></div>
+        </div>
+        <div style="background:var(--bg-surface-elevated); padding:1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:0.5rem;">Scheduled Personnel</span>
+          <div id="cell-view-roster" style="line-height:1.6; font-size:1rem; font-weight:500;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cell-view')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-cell-edit: Edit a cell's scheduled staff -->
+  <div class="modal-backdrop hidden" id="modal-cell-edit" style="z-index: 1100;">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>✏️ Edit Shift Roster</h3>
+        <button class="modal-close" onclick="closeModal('modal-cell-edit')">&times;</button>
+      </div>
+      <form id="cell-edit-form">
+        <input type="hidden" id="cell-edit-row-index">
+        <input type="hidden" id="cell-edit-shift-name">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date/Day</label>
+              <div id="cell-edit-date-display" style="font-weight:600; padding:0.5rem 0; font-size:1.05rem;"></div>
+            </div>
+            <div class="form-group">
+              <label>Shift</label>
+              <div id="cell-edit-shift-display" style="font-weight:600; padding:0.5rem 0; font-size:1.05rem; color:var(--cadmin-color);"></div>
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-top:1rem;">
+            <label>Assign Personnel (Select or Type)</label>
+            <div id="cell-edit-personnel-checklist" style="max-height:150px; overflow-y:auto; background:var(--bg-surface-elevated); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:0.75rem; display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem;">
+              <!-- Dynamic checkboxes of active clinic users -->
+            </div>
+            <label for="cell-edit-custom-roster">Add custom entry (e.g. Electrician, Cleaning staff)</label>
+            <input type="text" id="cell-edit-custom-roster" class="form-control" placeholder="e.g. Electrician, Cleaning staff, Security, Dr. Rajesh Iyer">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cell-edit')">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background-color: var(--success); color:#000;">Save Roster</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-hazard-alert: Flashing Screen Overlay for Emergency Alerts -->
+  <div class="modal-backdrop hidden" id="modal-hazard-alert" style="z-index: 1200; background: rgba(244, 63, 94, 0.4); backdrop-filter: blur(10px);">
+    <div class="modal-content" style="max-width: 500px; border: 3px solid var(--error); box-shadow: 0 0 30px rgba(244,63,94,0.6); animation: flashRed 1s infinite alternate;">
+      <div class="modal-header" style="background: var(--error); color: #fff; border-bottom: none; justify-content: center; padding: 1.25rem;">
+        <h2 style="margin:0; font-family:var(--font-heading); font-weight:700; font-size:1.5rem; display:flex; align-items:center; gap:0.5rem; text-transform:uppercase; letter-spacing:0.05em;">🚨 Emergency Alert</h2>
+      </div>
+      <div class="modal-body" style="padding: 2rem 1.5rem; text-align: center;">
+        <p style="font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-main);" id="hazard-alert-title"></p>
+        <div style="background: rgba(244, 63, 94, 0.15); border: 1px solid var(--error); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; text-align: left;">
+          <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem;">Alert Message / Instructions</span>
+          <div id="hazard-alert-msg" style="font-size: 1.1rem; font-weight: 500; color: var(--text-main); white-space: pre-wrap; line-height: 1.5;"></div>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">Please check on your colleagues and follow clinic safety protocols immediately.</p>
+      </div>
+      <div class="modal-footer" style="border-top: none; justify-content: center; padding: 1.25rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-hazard-alert')" style="background-color: var(--error); color: #fff; font-weight: 700; border: none; padding: 0.75rem 2rem; font-size: 1.05rem; box-shadow: 0 4px 12px rgba(244, 63, 94, 0.3); cursor:pointer; border-radius:var(--radius-sm);">Acknowledge & Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-cadmin-auth: Security verification for Chat Archive access -->
+  <div class="modal-backdrop hidden" id="modal-cadmin-auth" style="z-index: 1200;">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>🔒 Security Verification</h3>
+        <button class="modal-close" onclick="closeModal('modal-cadmin-auth')">&times;</button>
+      </div>
+      <form id="cadmin-chat-auth-form" onsubmit="verifyCadminChatPassword(event)">
+        <div class="modal-body" style="padding:1.5rem;">
+          <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:1.25rem; line-height:1.5;">
+            To review the internal chat records, please enter your Clinic Administrator password.
+          </p>
+          <div class="form-group">
+            <label for="cadmin-auth-password">Administrator Password</label>
+            <input type="password" id="cadmin-auth-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+            <div id="cadmin-auth-error" class="hidden" style="color: var(--error); font-size: 0.8rem; margin-top: 0.5rem; font-weight: 500;">
+              ❌ Invalid password. Access Denied.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cadmin-auth')">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background-color: var(--success); color:#000;">Verify Access</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-cadmin-chat-audit: Clinic Admin internal chat log audit history -->
+  <div class="modal-backdrop hidden" id="modal-cadmin-chat-audit" style="z-index: 1100;">
+    <div class="modal-content" style="max-width: 900px; width: 95%;">
+      <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+        <h3 style="display:flex; align-items:center; gap:0.5rem;">📂 Staff Room Chat Archive</h3>
+        <div style="display:flex; align-items:center; gap:0.5rem; flex: 1; justify-content: flex-end; margin-right: 1.5rem;">
+          <input type="text" id="chat-audit-search" class="form-control" placeholder="Search sender or keyword..." style="max-width:250px; padding:0.4rem 0.8rem; font-size:0.85rem;" oninput="renderChatAuditLog()">
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-cadmin-chat-audit')">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 65vh;">
+        <div class="table-wrapper">
+          <table class="custom-table" id="chat-audit-table">
+            <thead>
+              <tr>
+                <th style="width: 140px;">Date & Time</th>
+                <th style="width: 180px;">Sender</th>
+                <th style="width: 180px;">Audience</th>
+                <th>Message Content</th>
+                <th style="width: 80px; text-align: center;">Alert</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Chat entries dynamically generated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cadmin-chat-audit')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       CLINIC STAFF ROOM CHAT WIDGET
+       ============================================ -->
+  <div id="clinic-chat-widget" class="hidden">
+    <!-- Floating Trigger Button -->
+    <button id="clinic-chat-trigger" onclick="toggleChatPanel()" title="Open Clinic Staff Chat">
+      <span class="chat-icon">💬</span>
+      <span class="chat-badge hidden" id="clinic-chat-badge">0</span>
+    </button>
+
+    <!-- Chat Panel -->
+    <div id="clinic-chat-panel" class="hidden glass-chat" style="position:relative;">
+      <div class="chat-header">
+        <div class="chat-header-title">
+          <span style="font-size:1.15rem;">💬</span> Staff Room Chat
+        </div>
+        <div class="chat-header-actions" style="display:flex; align-items:center; gap:0.25rem;">
+          <!-- Bell button to select recipients -->
+          <button type="button" id="chat-recipients-btn" onclick="toggleRecipientsPopover()" title="Select who to notify" style="background:none; border:none; color:var(--text-main); font-size:1.1rem; cursor:pointer; padding:0.25rem; display:flex; align-items:center; justify-content:center;">
+            🔔
+          </button>
+          <!-- Hazard Trigger Button -->
+          <button type="button" id="chat-hazard-btn" onclick="triggerHazardAlert()" title="Trigger Emergency Hazard Alert (Notifies ALL)" style="background:none; border:none; color:var(--error); font-size:1.1rem; cursor:pointer; padding:0.25rem; display:flex; align-items:center; justify-content:center;">
+            🚨
+          </button>
+          <!-- Sound toggle button -->
+          <button type="button" id="chat-sound-toggle" onclick="toggleChatSound()" title="Toggle Sound Alerts" style="background:none; border:none; color:var(--text-main); font-size:1rem; cursor:pointer; padding:0.25rem;">
+            🔊
+          </button>
+          <button type="button" class="chat-close-btn" onclick="toggleChatPanel()" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer; padding:0.25rem; line-height:1;">&times;</button>
+        </div>
+      </div>
+      
+      <!-- Dropdown for recipients (absolutely positioned over messages) -->
+      <div id="chat-recipients-popover" class="hidden" style="position:absolute; top:50px; left:10px; right:10px; background:var(--bg-surface-elevated); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:0.75rem; box-shadow:var(--shadow-md); z-index:1001;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; border-bottom:1px solid var(--border-color); padding-bottom:0.25rem;">
+          <span style="font-size:0.8rem; font-weight:600; color:var(--text-main);">🔔 Notify Recipients</span>
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" onclick="toggleRecipientsAll(true)" style="background:none; border:none; color:var(--accent-color); font-size:0.75rem; cursor:pointer; padding:0;">All</button>
+            <span style="color:var(--text-muted); font-size:0.75rem;">|</span>
+            <button type="button" onclick="toggleRecipientsAll(false)" style="background:none; border:none; color:var(--error); font-size:0.75rem; cursor:pointer; padding:0;">None</button>
+          </div>
+        </div>
+        <div id="chat-recipients-list" style="max-height:120px; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem; text-align:left;">
+          <!-- Dynamic checkboxes of other clinic users -->
+        </div>
+      </div>
+      
+      <div id="clinic-chat-messages" class="chat-messages-container">
+        <!-- Message bubble items dynamically loaded -->
+      </div>
+      
+      <form id="clinic-chat-form" onsubmit="sendClinicChatMessage(event)">
+        <input type="text" id="clinic-chat-input" class="chat-input" placeholder="Type a message..." autocomplete="off">
+        <button type="submit" class="chat-send-btn">Send</button>
       </form>
     </div>
   </div>
