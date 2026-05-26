@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediFlow | Unified Clinic Management PWA</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Secure multi-tenant clinical workflow suite featuring digital prescription pads, intake records, diagnostics, and precise print routing.">
+  <meta name="keywords" content="clinic management, pwa, doctor prescription, vitals tracking, healthcare software">
+  <!-- PWA Manifest & Theme -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg">
+  
+  <!-- Modern UI CSS -->
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body class="role-doctor">
+  <!-- Glow Overlays -->
+  <div class="bg-glow" id="theme-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <!-- Primary Application Navigation Bar -->
+  <nav class="app-nav hidden" id="main-nav">
+    <a href="#" class="brand">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" rx="20" fill="url(#brand-grad)"/>
+        <path d="M30 50H70M50 30V70" stroke="white" stroke-width="12" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="brand-grad" x1="0" y1="0" x2="100" y2="100">
+            <stop stop-color="#6366f1"/>
+            <stop offset="1" stop-color="#0ea5e9"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span>MediFlow</span>
+    </a>
+    
+    <div class="nav-actions">
+      <!-- Database Connection Status Badge -->
+      <div class="connection-badge" id="db-status-badge">
+        <span class="dot yellow" id="db-status-dot"></span>
+        <span id="db-status-text">Detecting Storage...</span>
+      </div>
+
+      <!-- Theme Switcher -->
+      <button class="btn btn-secondary btn-sm" id="theme-toggle-btn" title="Toggle Light/Dark Theme">🌓 Theme</button>
+
+      <!-- Active Logged In Account Summary -->
+      <div class="nav-user">
+        <span class="user-badge" id="nav-user-role">Doctor</span>
+        <strong id="nav-user-name">Dr. Evelyn Martinez</strong>
+      </div>
+      
+      <button class="btn btn-secondary btn-sm btn-danger" id="logout-btn">Log Out</button>
+    </div>
+  </nav>
+
+  <!-- ============================================
+       1. AUTHENTICATION / LOGIN PAGE VIEW
+       ============================================ -->
+  <main class="login-container" id="view-login">
+    <div class="login-card fade-in">
+      <div class="login-header">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:5rem; height:5rem; margin: 0 auto 1rem;">
+          <circle cx="50" cy="50" r="45" fill="url(#login-grad)"/>
+          <path d="M32 50H68M50 32V68" stroke="white" stroke-width="10" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="login-grad" x1="0" y1="0" x2="100" y2="100">
+              <stop stop-color="#a855f7"/>
+              <stop offset="1" stop-color="#6366f1"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <h2>Welcome to MediFlow</h2>
+        <p>Enter your credentials to access the clinic workspace</p>
+      </div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" class="form-control" required placeholder="e.g. doctor1, cadmin1, staff1" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" class="form-control" required placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.5rem;">Authenticate Access</button>
+      </form>
+
+      <!-- Quick Role Switcher for local review and testing -->
+      <div class="quick-roles">
+        <p>Testing Sandboxes (Click to pre-fill credentials)</p>
+        <div class="role-buttons">
+          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('admin', 'password')">🔑 Super Admin</button>
+          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('cadmin1', 'password')">🏥 Clinic Admin</button>
+          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('staff1', 'password')">📋 Clinic Staff</button>
+          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('doctor1', 'password')">🩺 Doctor</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================
+       2. SUPER ADMIN (WEBSITE OWNER) VIEW PORTAL
+       ============================================ -->
+  <main class="dashboard-container hidden" id="view-admin">
+    <div class="section-header">
+      <h2>Super Administrator System Dashboard</h2>
+      <button class="btn btn-primary" id="admin-add-clinic-btn">+ Register New Clinic</button>
+    </div>
+
+    <!-- System Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🏢</div>
+        <div class="stat-info">
+          <h3 id="stat-clinics-count">0</h3>
+          <p>Total Clinics Registered</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-info">
+          <h3 id="stat-admins-count">0</h3>
+          <p>Active Facility Admins</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clinic Registry list -->
+    <div class="glass-panel">
+      <h3 style="margin-bottom: 1rem;">Registered Medical Clinics Directory</h3>
+      <div class="table-wrapper">
+        <table class="custom-table" id="clinics-table">
+          <thead>
+            <tr>
+              <th>Clinic ID</th>
+              <th>Clinic Name</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================
+       3. CLINIC ADMIN (FACILITY MANAGER) VIEW PORTAL
+       ============================================ -->
+  <main class="dashboard-container hidden" id="view-clinic-admin">
+    <div class="section-header">
+      <div>
+        <h2 id="clinic-admin-title">Facility Configuration Console</h2>
+        <p class="text-muted" id="clinic-admin-subtitle">Clinic Scoped Operations</p>
+      </div>
+      <button class="btn btn-primary" id="cadmin-add-user-btn">+ Add Clinic User Profile</button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🩺</div>
+        <div class="stat-info">
+          <h3 id="cadmin-stat-doctors">0</h3>
+          <p>Doctors Staffed</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-info">
+          <h3 id="cadmin-stat-staff">0</h3>
+          <p>Nurses & Receptionists</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <!-- Left side: User Management -->
+      <div class="glass-panel" style="flex: 2;">
+        <h3 style="margin-bottom: 1rem;">Clinic User Accounts Registry</h3>
+        <div class="table-wrapper">
+          <table class="custom-table" id="clinic-users-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Full Name</th>
+                <th>Access Level</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dynamic Injection -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right side: Blob Asset Settings -->
+      <div class="glass-panel" style="flex: 1;">
+        <h3 style="margin-bottom: 1rem;">Clinic Digital Assets (Netlify Blobs)</h3>
+        
+        <div class="form-group">
+          <label>Default Prescription Letterhead Logo</label>
+          <div style="border: 2px dashed var(--border-color); padding: 1rem; border-radius: var(--radius-sm); text-align: center; margin-bottom: 1rem;">
+            <img src="" id="clinic-header-preview" alt="Clinic Header Preview" style="max-height: 120px; max-width: 100%; object-fit: contain; margin-bottom: 1rem;" class="hidden">
+            <div id="clinic-header-empty" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">No letterhead image uploaded</div>
+            <input type="file" id="clinic-header-upload" accept="image/*" class="hidden">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('clinic-header-upload').click()">Upload New Image</button>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted)">
+            This image is securely stored on <strong>Netlify Blobs</strong> and will be fetched dynamically whenever plain paper prescriptions are printed.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================
+       4. STAFF (RECEPTIONIST / NURSE) VIEW PORTAL
+       ============================================ -->
+  <main class="dashboard-container hidden" id="view-staff">
+    <div class="section-header">
+      <h2>Staff Reception Desk & Vitals Intake</h2>
+      <button class="btn btn-primary" id="staff-add-patient-btn">+ Register New Patient</button>
+    </div>
+
+    <div class="glass-panel">
+      <h3 style="margin-bottom: 1rem;">Patient Demographics & Medical Intake Queue</h3>
+      <div class="table-wrapper">
+        <table class="custom-table" id="patients-table">
+          <thead>
+            <tr>
+              <th>Patient ID</th>
+              <th>Full Name</th>
+              <th>Age & Gender</th>
+              <th>Mobile</th>
+              <th>Vitals Recorded</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================
+       5. DOCTOR (MEDICAL PRACTITIONER) COCKPIT VIEW
+       ============================================ -->
+  <main class="dashboard-container hidden" id="view-doctor">
+    <div class="doctor-layout">
+      <!-- Column 1: Patient Selection & Vitals Intake View -->
+      <section class="glass-panel" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="panel-title">
+          <h3>Patient Registry</h3>
+        </div>
+        
+        <!-- Quick Patient Search Widget -->
+        <div class="search-widget">
+          <input type="text" id="doc-patient-search" class="form-control" placeholder="Search by ID, Name or Mobile...">
+        </div>
+
+        <!-- Waiting list -->
+        <div class="panel-scrollable card-list" id="doc-patient-list">
+          <!-- Dynamically populated patient profiles -->
+        </div>
+
+        <!-- Selected Patient Vitals Information Box -->
+        <div class="glass-panel" style="background: var(--bg-surface-elevated); margin-top: auto; padding: 1rem;" id="doc-vitals-card">
+          <h4 style="font-size: 0.9rem; border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">Selected Patient Vitals</h4>
+          <div id="doc-vitals-content" class="patient-vitals-banner">
+            <span style="color: var(--text-muted); font-size: 0.85rem; grid-column: span 2;">Select a patient to review recorded clinical vitals.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Column 2: Active Prescription Content Canvas -->
+      <section class="canvas-container">
+        <div class="workspace-canvas">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="font-family: var(--font-heading);">Rx Active Workspace</h3>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <div class="toggle-switch-container">
+                <span style="font-size: 0.85rem; color: var(--text-muted);">Plain Paper?</span>
+                <label class="switch">
+                  <input type="checkbox" id="print-plain-paper-toggle">
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <button class="btn btn-primary btn-sm" id="doctor-print-btn" style="background-color: var(--success); color: #000;">Print Prescription</button>
+            </div>
+          </div>
+
+          <!-- Clinical Notes Box -->
+          <div class="canvas-section">
+            <div class="canvas-section-title">Clinical Notes (Chief Complaint, History, Allergies)</div>
+            <div class="form-row">
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted)">Chief Complaint (C/C)</label>
+                <textarea id="canvas-cc" class="canvas-textarea" style="min-height: 45px;" placeholder="e.g. Cough since 3 days..."></textarea>
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted)">Signs & Symptoms</label>
+                <textarea id="canvas-signs" class="canvas-textarea" style="min-height: 45px;" placeholder="e.g. Pharyngeal congestion..."></textarea>
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.5rem;">
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted)">Medical & Drug History</label>
+                <textarea id="canvas-history" class="canvas-textarea" style="min-height: 45px;" placeholder="e.g. Hypertension since 5 years..."></textarea>
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted)">Allergies</label>
+                <textarea id="canvas-allergies" class="canvas-textarea" style="min-height: 45px;" placeholder="e.g. Penicillin allergy..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Clinical Findings & Diagnosis -->
+          <div class="canvas-section">
+            <div class="canvas-section-title">Clinical Findings & Diagnosis</div>
+            <textarea id="canvas-diagnosis" class="canvas-textarea" style="min-height: 40px;" placeholder="e.g. Suspected viral gastroenteritis..."></textarea>
+          </div>
+
+          <!-- The main Rx drug list layout -->
+          <div class="canvas-section" style="flex: 1; display: flex; flex-direction: column;">
+            <div class="canvas-section-title">Prescription Proper (Rx Medicine Advice)</div>
+            <textarea id="canvas-prescription" class="canvas-textarea" style="flex: 1; min-height: 120px;" placeholder="Select templates and drug pickers to compose medicine details. Add manual instructions here..."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- Column 3: Configurable Medical Toolboxes -->
+      <section class="toolbox panel-scrollable">
+        
+        <!-- Specialty & Template Selector -->
+        <div class="tool-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="font-size: 0.95rem;">Prescription Templates</h4>
+            <button class="btn btn-secondary btn-sm" id="add-template-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">+ Add</button>
+          </div>
+          
+          <select id="specialty-selector" class="picker-select">
+            <option value="General">General Medicine</option>
+            <option value="Optha">Ophthalmology</option>
+            <option value="ENT">ENT Specialty</option>
+            <option value="Derma">Dermatology</option>
+          </select>
+          
+          <div class="card-list" id="toolbox-templates-list" style="max-height: 150px; overflow-y: auto;">
+            <!-- Dynamically populated templates -->
+          </div>
+        </div>
+
+        <!-- Drug Directory Picker -->
+        <div class="tool-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="font-size: 0.95rem;">Drug Directory</h4>
+            <button class="btn btn-secondary btn-sm" id="add-drug-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">+ Add</button>
+          </div>
+          <select id="drug-category-selector" class="picker-select">
+            <option value="All">All Categories</option>
+            <option value="Antibiotics">Antibiotics</option>
+            <option value="NSAIDs/Analgesics">NSAIDs/Analgesics</option>
+            <option value="Antihistamines">Antihistamines</option>
+            <option value="Derma">Dermatology (External)</option>
+            <option value="General">General / Vitamin Supplements</option>
+          </select>
+          <div class="grid-pills" id="toolbox-drugs-list">
+            <!-- Dynamic drugs -->
+          </div>
+        </div>
+
+        <!-- Lab Test Advice Picker -->
+        <div class="tool-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="font-size: 0.95rem;">Lab Diagnostic Orders</h4>
+            <button class="btn btn-secondary btn-sm" id="add-test-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">+ Add</button>
+          </div>
+          <div class="grid-pills" id="toolbox-tests-list" style="max-height: 120px;">
+            <!-- Dynamic lab tests -->
+          </div>
+          <div style="margin-top: 0.75rem; border-top: 1px dashed var(--border-color); padding-top: 0.5rem;">
+            <span style="font-size: 0.75rem; color: var(--text-muted)">Selected for Prescription:</span>
+            <div class="grid-pills" id="selected-tests-list" style="margin-top: 0.25rem;">
+              <!-- Selected tests indicator -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Disease-Specific Special Advice -->
+        <div class="tool-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="font-size: 0.95rem;">Special Medical Advice</h4>
+            <button class="btn btn-secondary btn-sm" id="add-advice-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">+ Add</button>
+          </div>
+          <div class="grid-pills" id="toolbox-advice-list" style="max-height: 120px;">
+            <!-- Dynamic advice items -->
+          </div>
+          <div style="margin-top: 0.75rem; border-top: 1px dashed var(--border-color); padding-top: 0.5rem;">
+            <span style="font-size: 0.75rem; color: var(--text-muted)">Selected for Prescription:</span>
+            <div class="grid-pills" id="selected-advice-list" style="margin-top: 0.25rem;">
+              <!-- Selected advice list -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <!-- ============================================
+       MODAL: PRINT PREVIEW AND ROUTING (WYSIWYG)
+       ============================================ -->
+  <div class="modal-backdrop hidden" id="modal-print-preview">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3>Physical Prescription Print Preview (A4 Size Alignment)</h3>
+        <button class="modal-close" onclick="closeModal('modal-print-preview')">&times;</button>
+      </div>
+      <div class="preview-modal-body">
+        
+        <!-- Onscreen A4 Representation simulating printed page -->
+        <div class="prescription-paper" id="screen-prescription-paper">
+          <!-- Top 4cm Space -->
+          <div class="prescription-head" id="print-header-zone">
+            <span style="color: #94a3b8; font-size: 9pt;" id="print-header-placeholder">4 cm Pad Letterhead Space (Blank by default for pre-printed pads)</span>
+            <img src="" id="print-header-image" class="prescription-head-logo hidden" alt="Letterhead Logo">
+          </div>
+          
+          <!-- Next 2cm Demography Banner -->
+          <div class="prescription-demography">
+            <div class="demography-col">
+              <div class="demography-row">
+                <span>Patient ID:</span> <strong id="print-patient-id">N/A</strong>
+              </div>
+              <div class="demography-row">
+                <span>Full Name:</span> <strong id="print-patient-name">Select Patient</strong>
+              </div>
+            </div>
+            <div class="demography-col">
+              <div class="demography-row">
+                <span>Age / Gender:</span> <strong id="print-patient-age-gender">N/A</strong>
+              </div>
+              <div class="demography-row">
+                <span>Date:</span> <strong id="print-prescription-date">26-May-2026</strong>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Bottom Area Split Layout -->
+          <div class="prescription-body-split">
+            <!-- Left Column: 4cm Vitals & Advice -->
+            <div class="prescription-left-col">
+              <div>
+                <div class="print-section-title">Patient Vitals</div>
+                <div class="vitals-grid">
+                  <div class="vitals-row"><span>Height:</span><strong id="print-v-height">-</strong></div>
+                  <div class="vitals-row"><span>Weight:</span><strong id="print-v-weight">-</strong></div>
+                  <div class="vitals-row"><span>BP:</span><strong id="print-v-bp">-</strong></div>
+                  <div class="vitals-row"><span>Pulse:</span><strong id="print-v-pulse">-</strong></div>
+                  <div class="vitals-row"><span>SpO2:</span><strong id="print-v-spo2">-</strong></div>
+                </div>
+              </div>
+              
+              <div>
+                <div class="print-section-title">Lab Orders</div>
+                <ul class="print-list" id="print-lab-orders">
+                  <li>No tests ordered.</li>
+                </ul>
+              </div>
+              
+              <div>
+                <div class="print-section-title">Special Advice</div>
+                <ul class="print-list" id="print-special-advice">
+                  <li>No custom advice.</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Right Column: Clinical Notes, Diagnosis, Prescription Details -->
+            <div class="prescription-right-col">
+              <div>
+                <div class="print-section-title">Clinical Presentation</div>
+                <div style="font-size: 9.5pt; margin-bottom: 0.4cm;">
+                  <strong>Chief Complaint (C/C):</strong> <span id="print-notes-cc">-</span>
+                </div>
+                <div style="font-size: 9.5pt; margin-bottom: 0.4cm;">
+                  <strong>Signs & Symptoms:</strong> <span id="print-notes-signs">-</span>
+                </div>
+                <div style="font-size: 9.5pt; margin-bottom: 0.4cm;">
+                  <strong>Medical & Drug History:</strong> <span id="print-notes-history">-</span>
+                </div>
+                <div style="font-size: 9.5pt;">
+                  <strong>Known Allergies:</strong> <span id="print-notes-allergies">-</span>
+                </div>
+              </div>
+              
+              <div>
+                <div class="print-section-title">Findings & Diagnosis</div>
+                <div style="font-size: 10pt; font-weight: 600;" id="print-diagnosis">-</div>
+              </div>
+              
+              <div class="prescription-rx">
+                <div class="rx-symbol">℞</div>
+                <div class="prescription-proper-text" id="print-rx-proper">No medicines prescribed.</div>
+              </div>
+              
+              <!-- Footer: Signature & Qualification -->
+              <div class="prescription-footer">
+                <div class="doctor-signature-space">
+                  <div class="signature-line"></div>
+                  <div class="signature-doctor-name" id="print-doc-name">Dr. Evelyn Martinez</div>
+                  <div class="signature-doctor-qual" id="print-doc-qual">MD, FACP<br>Senior Consultant Physician</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-print-preview')">Close Preview</button>
+        <button class="btn btn-primary" onclick="window.print()" style="background-color: var(--success); color: #000;">Trigger System Printer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       HIDDEN PRINT CONTAINER FOR NATIVE DRIVER (@media print)
+       ============================================ -->
+  <div id="print-container"></div>
+
+  <!-- ============================================
+       OTHER POPUP DIALOGS / DATA FORMS
+       ============================================ -->
+
+  <!-- Add Clinic Modal (Super Admin) -->
+  <div class="modal-backdrop hidden" id="modal-clinic">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="clinic-modal-title">Register New Clinic Profile</h3>
+        <button class="modal-close" onclick="closeModal('modal-clinic')">&times;</button>
+      </div>
+      <form id="clinic-form">
+        <div class="modal-body">
+          <input type="hidden" id="clinic-form-id">
+          <div class="form-group">
+            <label for="clinic-form-name">Clinic Name</label>
+            <input type="text" id="clinic-form-name" class="form-control" required placeholder="e.g. Apex MultiSpecialty Center">
+          </div>
+          <div class="form-group">
+            <label for="clinic-form-subscription">Subscription Status</label>
+            <select id="clinic-form-subscription" class="form-control">
+              <option value="Active">Active Subscription</option>
+              <option value="Suspended">Suspended</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-clinic')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Registry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add User Modal (Clinic Admin) -->
+  <div class="modal-backdrop hidden" id="modal-user">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="user-modal-title">Add Clinic User Profile</h3>
+        <button class="modal-close" onclick="closeModal('modal-user')">&times;</button>
+      </div>
+      <form id="user-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="user-form-username">Username</label>
+            <input type="text" id="user-form-username" class="form-control" required placeholder="e.g. nurse_sarah">
+          </div>
+          <div class="form-group">
+            <label for="user-form-password">Password</label>
+            <input type="password" id="user-form-password" class="form-control" required placeholder="••••••••" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="user-form-name">Full Name</label>
+            <input type="text" id="user-form-name" class="form-control" required placeholder="e.g. Sarah Jenkins">
+          </div>
+          <div class="form-group">
+            <label for="user-form-role">Access Level / Role</label>
+            <select id="user-form-role" class="form-control">
+              <option value="staff">Staff (Nurse / Receptionist)</option>
+              <option value="doctor">Doctor (Medical Practitioner)</option>
+            </select>
+          </div>
+          
+          <!-- Doctor Custom Meta Fields -->
+          <div id="doctor-custom-fields" class="hidden">
+            <div class="form-group">
+              <label for="user-form-qual">Qualifications</label>
+              <input type="text" id="user-form-qual" class="form-control" placeholder="e.g. MBBS, MD, FACP">
+            </div>
+            <div class="form-group">
+              <label for="user-form-desig">Designation</label>
+              <input type="text" id="user-form-desig" class="form-control" placeholder="e.g. Senior Pediatrician">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-user')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create User Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Patient Modal (Staff) -->
+  <div class="modal-backdrop hidden" id="modal-patient">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="patient-modal-title">Register New Patient</h3>
+        <button class="modal-close" onclick="closeModal('modal-patient')">&times;</button>
+      </div>
+      <form id="patient-form">
+        <div class="modal-body">
+          <input type="hidden" id="patient-form-id">
+          <div class="form-group">
+            <label for="patient-form-name">Patient Full Name</label>
+            <input type="text" id="patient-form-name" class="form-control" required placeholder="e.g. John Doe">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="patient-form-age">Age (Years)</label>
+              <input type="number" id="patient-form-age" class="form-control" required min="0" max="150" placeholder="e.g. 45">
+            </div>
+            <div class="form-group">
+              <label for="patient-form-gender">Gender</label>
+              <select id="patient-form-gender" class="form-control">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="patient-form-mobile">Mobile Phone Number</label>
+            <input type="tel" id="patient-form-mobile" class="form-control" required placeholder="e.g. 9876543210">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-patient')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Patient Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Vitals Modal (Staff) -->
+  <div class="modal-backdrop hidden" id="modal-vitals">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Record Nurse Intake Vitals</h3>
+        <button class="modal-close" onclick="closeModal('modal-vitals')">&times;</button>
+      </div>
+      <form id="vitals-form">
+        <div class="modal-body">
+          <input type="hidden" id="vitals-form-patient-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="vitals-form-height">Height (e.g. cm)</label>
+              <input type="text" id="vitals-form-height" class="form-control" placeholder="e.g. 175 cm">
+            </div>
+            <div class="form-group">
+              <label for="vitals-form-weight">Weight (e.g. kg)</label>
+              <input type="text" id="vitals-form-weight" class="form-control" placeholder="e.g. 68 kg">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="vitals-form-pulse">Pulse Rate (e.g. bpm)</label>
+              <input type="text" id="vitals-form-pulse" class="form-control" placeholder="e.g. 72 bpm">
+            </div>
+            <div class="form-group">
+              <label for="vitals-form-bp">Blood Pressure (BP)</label>
+              <input type="text" id="vitals-form-bp" class="form-control" placeholder="e.g. 120/80 mmHg">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="vitals-form-spo2">Oxygen Saturation (SpO2)</label>
+            <input type="text" id="vitals-form-spo2" class="form-control" placeholder="e.g. 98%">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-vitals')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Recorded Vitals</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Custom Item Dialog (Doctor configuration lists) -->
+  <div class="modal-backdrop hidden" id="modal-doctor-item">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="doc-item-title">Manage Custom Configuration Item</h3>
+        <button class="modal-close" onclick="closeModal('modal-doctor-item')">&times;</button>
+      </div>
+      <form id="doc-item-form">
+        <div class="modal-body">
+          <input type="hidden" id="doc-item-type"> <!-- 'template', 'drug', 'test', or 'advice' -->
+          <input type="hidden" id="doc-item-id">
+          
+          <div id="doc-item-general-fields">
+            <div class="form-group">
+              <label for="doc-item-name" id="doc-item-name-label">Name / Label</label>
+              <input type="text" id="doc-item-name" class="form-control" required placeholder="e.g. Amoxicillin 500mg">
+            </div>
+          </div>
+
+          <!-- Template Fields -->
+          <div id="doc-item-template-fields" class="hidden">
+            <div class="form-group">
+              <label for="doc-item-specialty">Medical Specialty Category</label>
+              <select id="doc-item-specialty" class="form-control">
+                <option value="General">General Medicine</option>
+                <option value="Optha">Ophthalmology</option>
+                <option value="ENT">ENT Specialty</option>
+                <option value="Derma">Dermatology</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="doc-item-cc">Chief Complaint (C/C)</label>
+                <textarea id="doc-item-cc" class="form-control" style="min-height:50px; font-size:0.85rem;" placeholder="Chief complaints..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="doc-item-signs">Signs & Symptoms</label>
+                <textarea id="doc-item-signs" class="form-control" style="min-height:50px; font-size:0.85rem;" placeholder="Observed signs..."></textarea>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="doc-item-history">History Details</label>
+                <textarea id="doc-item-history" class="form-control" style="min-height:50px; font-size:0.85rem;" placeholder="Medical history details..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="doc-item-allergies">Allergies</label>
+                <textarea id="doc-item-allergies" class="form-control" style="min-height:50px; font-size:0.85rem;" placeholder="Known drug allergies..."></textarea>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="doc-item-diagnosis">Diagnosis / Findings</label>
+              <input type="text" id="doc-item-diagnosis" class="form-control" placeholder="Clinical provisional diagnosis">
+            </div>
+            <div class="form-group">
+              <label for="doc-item-rx">Prescription Details (Appends to Canvas Proper)</label>
+              <textarea id="doc-item-rx" class="form-control" style="min-height:80px; font-size:0.85rem;" placeholder="Tab. Medicine Name - dosage details - duration"></textarea>
+            </div>
+          </div>
+
+          <!-- Drug Specific Fields -->
+          <div id="doc-item-drug-fields" class="hidden">
+            <div class="form-group">
+              <label for="doc-item-drug-category">Drug Category</label>
+              <select id="doc-item-drug-category" class="form-control">
+                <option value="Antibiotics">Antibiotics</option>
+                <option value="NSAIDs/Analgesics">NSAIDs/Analgesics</option>
+                <option value="Antihistamines">Antihistamines</option>
+                <option value="Derma">Dermatology (External)</option>
+                <option value="General">General / Vitamin Supplements</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Special Advice Fields -->
+          <div id="doc-item-advice-fields" class="hidden">
+            <div class="form-group">
+              <label for="doc-item-advice-text">Special Advice Content Text</label>
+              <textarea id="doc-item-advice-text" class="form-control" style="min-height:80px; font-size:0.85rem;" placeholder="Advice text instructions..."></textarea>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-doctor-item')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Config Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Primary Application Script Bundle -->
+  <script src="./src/mockData.js"></script>
+  <script src="./src/db.js"></script>
+  <script src="./src/app.js"></script>
+
+  <!-- Global scripts for modal handles and prefill logins -->
+  <script>
+    // Prefill login helper
+    function prefillLogin(username, password) {
+      document.getElementById('login-username').value = username;
+      document.getElementById('login-password').value = password;
+    }
+    
+    // Modal controls (attached to window scope for easy HTML onclick access)
+    window.openModal = function(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+    };
+    
+    window.closeModal = function(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    };
+
+    // Service Worker Registry (PWA offline activation support)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(registration => {
+            console.log('MediFlow ServiceWorker registered successfully with scope:', registration.scope);
+          })
+          .catch(error => {
+            console.warn('MediFlow ServiceWorker registration failed:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>

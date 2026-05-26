@@ -1,0 +1,12 @@
+# Netlify Dev sandbox folders
+.netlify/
+
+# Node dependencies (if Netlify CLI is installed locally)
+node_modules/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
