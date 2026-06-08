@@ -26,6 +26,19 @@ async function ensureSeeded() {
     
     await kv.set('mediflow_seeded', 'true');
     console.log('Vercel KV Seeded successfully.');
+  } else {
+    // Safety check: Make sure Super Admin exists in the user database
+    let users = await kv.get('mediflow_users');
+    if (typeof users === 'string') {
+      try { users = JSON.parse(users); } catch (e) { users = []; }
+    }
+    const userList = Array.isArray(users) ? users : [];
+    const hasAdmin = userList.some(u => u.username === 'admin');
+    if (!hasAdmin) {
+      userList.push({ username: 'admin', password: 'password', role: 'admin', clinicId: null, name: 'Super Administrator' });
+      await kv.set('mediflow_users', userList);
+      console.log('Super Admin user restored to existing database.');
+    }
   }
 }
 
@@ -51,6 +64,28 @@ async function executeDbAction(action, payload) {
   };
 
   switch (action) {
+    case 'reseedDatabase': {
+      await kv.set('mediflow_clinics', seeds.INITIAL_CLINICS);
+      await kv.set('mediflow_users', seeds.INITIAL_USERS);
+      await kv.set('mediflow_patients', seeds.INITIAL_PATIENTS);
+      await kv.set('mediflow_vitals', seeds.INITIAL_VITALS);
+      await kv.set('mediflow_templates', seeds.INITIAL_TEMPLATES);
+      await kv.set('mediflow_drugs', seeds.INITIAL_DRUGS);
+      await kv.set('mediflow_tests', seeds.INITIAL_TESTS);
+      await kv.set('mediflow_advice', seeds.INITIAL_ADVICE);
+      await kv.set('mediflow_appointments', seeds.INITIAL_APPOINTMENTS);
+      await kv.set('mediflow_bills', seeds.INITIAL_BILLS);
+      await kv.set('mediflow_insurance', seeds.INITIAL_INSURANCE);
+      await kv.set('mediflow_attendance', seeds.INITIAL_ATTENDANCE);
+      await kv.set('mediflow_doctor_slots', seeds.INITIAL_DOCTOR_SLOTS);
+      await kv.set('mediflow_patient_accounts', []);
+      await kv.set('mediflow_prescriptions', []);
+      await kv.set('mediflow_drug_categories', seeds.INITIAL_DRUG_CATEGORIES);
+      await kv.set('mediflow_specialities', seeds.INITIAL_SPECIALITIES);
+      await kv.set('mediflow_seeded', 'true');
+      return { success: true, message: 'Database reseeded successfully.' };
+    }
+
     case 'getClinics':
       return await getList('mediflow_clinics');
 

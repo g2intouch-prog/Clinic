@@ -21,6 +21,20 @@ let doctorDrugCategories = [];
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   await checkDBStatus();
+
+  // Secret reset command: visiting yoursite.com/?reseed=true will re-seed Vercel KV
+  if (window.location.search.includes('reseed=true')) {
+    try {
+      const res = await DB.request('reseedDatabase');
+      alert('Reset success: ' + res.message);
+      // Strip query param to avoid reload loop
+      window.location.href = window.location.origin + window.location.pathname;
+      return;
+    } catch (e) {
+      alert('Database Reset Failed: ' + e.message);
+    }
+  }
+
   restoreSession();
 });
 
