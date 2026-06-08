@@ -96,6 +96,16 @@
         <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.5rem;">Authenticate Access</button>
       </form>
 
+      <!-- Quick Role Switcher for local review and testing -->
+      <div class="quick-roles">
+        <p>Testing Sandboxes (Click to pre-fill credentials)</p>
+        <div class="role-buttons">
+          <button class="btn btn-secondary btn-sm hidden" id="quick-role-admin" onclick="prefillLogin('admin', 'password')">🔑 Super Admin</button>
+          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('cadmin1', 'password')">🏥 Clinic Admin</button>
+          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('staff1', 'password')">📋 Clinic Staff</button>
+          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('doctor1', 'password')">🩺 Doctor</button>
+        </div>
+      </div>
 
       <div style="text-align: center; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
         <a href="#" onclick="openModal('modal-learn-more'); return false;" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500;">🏥 Interested Clinic? Learn More</a>
@@ -1859,11 +1869,17 @@
   </div>
 
   <!-- Primary Application Script Bundle -->
+  <script src="./src/mockData.js"></script>
   <script src="./src/db.js"></script>
   <script src="./src/app.js"></script>
 
-  <!-- Global scripts for modal handles -->
+  <!-- Global scripts for modal handles and prefill logins -->
   <script>
+    // Prefill login helper
+    function prefillLogin(username, password) {
+      document.getElementById('login-username').value = username;
+      document.getElementById('login-password').value = password;
+    }
     
     // Modal controls (attached to window scope for easy HTML onclick access)
     window.openModal = function(modalId) {

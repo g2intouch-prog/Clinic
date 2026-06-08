@@ -52,6 +52,18 @@ const server = http.createServer((req, res) => {
       }
       // Parse query string into req.query
       req.query = Object.fromEntries(new URL(req.url, `http://localhost:${PORT}`).searchParams);
+      
+      // Decorate res for Vercel Serverless compatibility
+      res.status = (code) => {
+        res.statusCode = code;
+        return res;
+      };
+      res.json = (data) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+        return res;
+      };
+
       apiHandler(req, res);
     });
     return;
