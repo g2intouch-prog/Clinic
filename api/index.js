@@ -4,8 +4,8 @@ const seeds = require('./seedData');
 
 // Supabase client (uses SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars)
 function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.SUPABASE_URL || process.env.Clinic_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.Clinic_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Supabase config missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
   return createClient(url, key);
 }
@@ -490,14 +490,14 @@ module.exports = async (req, res) => {
   if (path.endsWith('/db')) {
     try {
       const { action, payload } = req.body;
-      const hasDbConfig = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const hasDbConfig = !!((process.env.SUPABASE_URL || process.env.Clinic_SUPABASE_URL) && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.Clinic_SUPABASE_SERVICE_ROLE_KEY));
 
       if (action === 'check') {
         return res.status(200).json({ cloudActive: hasDbConfig });
       }
 
       if (!hasDbConfig) {
-        return res.status(503).json({ error: 'Supabase config missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in Vercel Environment Variables.' });
+        return res.status(503).json({ error: 'Supabase config missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or Clinic_ prefixed versions) are required in Vercel Environment Variables.' });
       }
 
       const supabase = getSupabase();
