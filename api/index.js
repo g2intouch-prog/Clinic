@@ -1,88 +1,103 @@
-const { kv } = require('@vercel/kv');
+const { createClient } = require('@supabase/supabase-js');
 const { put } = require('@vercel/blob');
 const seeds = require('./seedData');
 
-// Ensure Vercel KV is seeded on first run
-async function ensureSeeded() {
-  const seeded = await kv.get('mediflow_seeded');
+// Supabase client (uses SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars)
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('Supabase config missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
+  return createClient(url, key);
+}
+
+// KV-style helpers using Supabase kv_store table
+async function kvGet(supabase, key) {
+  const { data, error } = await supabase
+    .from('kv_store')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+  if (error) throw new Error(`kvGet(${key}) failed: ${error.message}`);
+  return data ? data.value : null;
+}
+
+async function kvSet(supabase, key, value) {
+  const { error } = await supabase
+    .from('kv_store')
+    .upsert({ key, value }, { onConflict: 'key' });
+  if (error) throw new Error(`kvSet(${key}) failed: ${error.message}`);
+}
+
+// Ensure database is seeded on first run
+async function ensureSeeded(supabase) {
+  const seeded = await kvGet(supabase, 'mediflow_seeded');
   if (!seeded) {
-    await kv.set('mediflow_clinics', seeds.INITIAL_CLINICS);
-    await kv.set('mediflow_users', seeds.INITIAL_USERS);
-    await kv.set('mediflow_patients', seeds.INITIAL_PATIENTS);
-    await kv.set('mediflow_vitals', seeds.INITIAL_VITALS);
-    await kv.set('mediflow_templates', seeds.INITIAL_TEMPLATES);
-    await kv.set('mediflow_drugs', seeds.INITIAL_DRUGS);
-    await kv.set('mediflow_tests', seeds.INITIAL_TESTS);
-    await kv.set('mediflow_advice', seeds.INITIAL_ADVICE);
-    await kv.set('mediflow_appointments', seeds.INITIAL_APPOINTMENTS);
-    await kv.set('mediflow_bills', seeds.INITIAL_BILLS);
-    await kv.set('mediflow_insurance', seeds.INITIAL_INSURANCE);
-    await kv.set('mediflow_attendance', seeds.INITIAL_ATTENDANCE);
-    await kv.set('mediflow_doctor_slots', seeds.INITIAL_DOCTOR_SLOTS);
-    await kv.set('mediflow_patient_accounts', []);
-    await kv.set('mediflow_prescriptions', []);
-    await kv.set('mediflow_drug_categories', seeds.INITIAL_DRUG_CATEGORIES);
-    await kv.set('mediflow_specialities', seeds.INITIAL_SPECIALITIES);
-    
-    await kv.set('mediflow_seeded', 'true');
-    console.log('Vercel KV Seeded successfully.');
+    await kvSet(supabase, 'mediflow_clinics', seeds.INITIAL_CLINICS);
+    await kvSet(supabase, 'mediflow_users', seeds.INITIAL_USERS);
+    await kvSet(supabase, 'mediflow_patients', seeds.INITIAL_PATIENTS);
+    await kvSet(supabase, 'mediflow_vitals', seeds.INITIAL_VITALS);
+    await kvSet(supabase, 'mediflow_templates', seeds.INITIAL_TEMPLATES);
+    await kvSet(supabase, 'mediflow_drugs', seeds.INITIAL_DRUGS);
+    await kvSet(supabase, 'mediflow_tests', seeds.INITIAL_TESTS);
+    await kvSet(supabase, 'mediflow_advice', seeds.INITIAL_ADVICE);
+    await kvSet(supabase, 'mediflow_appointments', seeds.INITIAL_APPOINTMENTS);
+    await kvSet(supabase, 'mediflow_bills', seeds.INITIAL_BILLS);
+    await kvSet(supabase, 'mediflow_insurance', seeds.INITIAL_INSURANCE);
+    await kvSet(supabase, 'mediflow_attendance', seeds.INITIAL_ATTENDANCE);
+    await kvSet(supabase, 'mediflow_doctor_slots', seeds.INITIAL_DOCTOR_SLOTS);
+    await kvSet(supabase, 'mediflow_patient_accounts', []);
+    await kvSet(supabase, 'mediflow_prescriptions', []);
+    await kvSet(supabase, 'mediflow_drug_categories', seeds.INITIAL_DRUG_CATEGORIES);
+    await kvSet(supabase, 'mediflow_specialities', seeds.INITIAL_SPECIALITIES);
+    await kvSet(supabase, 'mediflow_seeded', 'true');
+    console.log('Supabase DB Seeded successfully.');
   } else {
-    // Safety check: Make sure Super Admin exists in the user database
-    let users = await kv.get('mediflow_users');
-    if (typeof users === 'string') {
-      try { users = JSON.parse(users); } catch (e) { users = []; }
-    }
-    const userList = Array.isArray(users) ? users : [];
-    const hasAdmin = userList.some(u => u.username === 'admin');
+    // Safety check: restore Super Admin if missing
+    const userList = (await kvGet(supabase, 'mediflow_users')) || [];
+    const hasAdmin = Array.isArray(userList) && userList.some(u => u.username === 'admin');
     if (!hasAdmin) {
-      userList.push({ username: 'admin', password: 'password', role: 'admin', clinicId: null, name: 'Super Administrator' });
-      await kv.set('mediflow_users', userList);
-      console.log('Super Admin user restored to existing database.');
+      const updated = Array.isArray(userList) ? [...userList] : [];
+      updated.push({ username: 'admin', password: 'password', role: 'admin', clinicId: null, name: 'Super Administrator' });
+      await kvSet(supabase, 'mediflow_users', updated);
+      console.log('Super Admin user restored.');
     }
   }
 }
 
 // Database Action Handler
-async function executeDbAction(action, payload) {
-  await ensureSeeded();
+async function executeDbAction(supabase, action, payload) {
+  await ensureSeeded(supabase);
 
   const getList = async (key) => {
-    const raw = await kv.get(key);
+    const raw = await kvGet(supabase, key);
     if (!raw) return [];
     if (typeof raw === 'string') {
-      try {
-        return JSON.parse(raw);
-      } catch (err) {
-        console.error(`Error parsing KV key ${key}:`, err);
-        return [];
-      }
+      try { return JSON.parse(raw); } catch (e) { return []; }
     }
-    return raw;
+    return Array.isArray(raw) ? raw : [];
   };
-  const saveList = async (key, data) => {
-    await kv.set(key, data);
-  };
+  const saveList = async (key, data) => await kvSet(supabase, key, data);
 
   switch (action) {
     case 'reseedDatabase': {
-      await kv.set('mediflow_clinics', seeds.INITIAL_CLINICS);
-      await kv.set('mediflow_users', seeds.INITIAL_USERS);
-      await kv.set('mediflow_patients', seeds.INITIAL_PATIENTS);
-      await kv.set('mediflow_vitals', seeds.INITIAL_VITALS);
-      await kv.set('mediflow_templates', seeds.INITIAL_TEMPLATES);
-      await kv.set('mediflow_drugs', seeds.INITIAL_DRUGS);
-      await kv.set('mediflow_tests', seeds.INITIAL_TESTS);
-      await kv.set('mediflow_advice', seeds.INITIAL_ADVICE);
-      await kv.set('mediflow_appointments', seeds.INITIAL_APPOINTMENTS);
-      await kv.set('mediflow_bills', seeds.INITIAL_BILLS);
-      await kv.set('mediflow_insurance', seeds.INITIAL_INSURANCE);
-      await kv.set('mediflow_attendance', seeds.INITIAL_ATTENDANCE);
-      await kv.set('mediflow_doctor_slots', seeds.INITIAL_DOCTOR_SLOTS);
-      await kv.set('mediflow_patient_accounts', []);
-      await kv.set('mediflow_prescriptions', []);
-      await kv.set('mediflow_drug_categories', seeds.INITIAL_DRUG_CATEGORIES);
-      await kv.set('mediflow_specialities', seeds.INITIAL_SPECIALITIES);
-      await kv.set('mediflow_seeded', 'true');
+      await kvSet(supabase, 'mediflow_clinics', seeds.INITIAL_CLINICS);
+      await kvSet(supabase, 'mediflow_users', seeds.INITIAL_USERS);
+      await kvSet(supabase, 'mediflow_patients', seeds.INITIAL_PATIENTS);
+      await kvSet(supabase, 'mediflow_vitals', seeds.INITIAL_VITALS);
+      await kvSet(supabase, 'mediflow_templates', seeds.INITIAL_TEMPLATES);
+      await kvSet(supabase, 'mediflow_drugs', seeds.INITIAL_DRUGS);
+      await kvSet(supabase, 'mediflow_tests', seeds.INITIAL_TESTS);
+      await kvSet(supabase, 'mediflow_advice', seeds.INITIAL_ADVICE);
+      await kvSet(supabase, 'mediflow_appointments', seeds.INITIAL_APPOINTMENTS);
+      await kvSet(supabase, 'mediflow_bills', seeds.INITIAL_BILLS);
+      await kvSet(supabase, 'mediflow_insurance', seeds.INITIAL_INSURANCE);
+      await kvSet(supabase, 'mediflow_attendance', seeds.INITIAL_ATTENDANCE);
+      await kvSet(supabase, 'mediflow_doctor_slots', seeds.INITIAL_DOCTOR_SLOTS);
+      await kvSet(supabase, 'mediflow_patient_accounts', []);
+      await kvSet(supabase, 'mediflow_prescriptions', []);
+      await kvSet(supabase, 'mediflow_drug_categories', seeds.INITIAL_DRUG_CATEGORIES);
+      await kvSet(supabase, 'mediflow_specialities', seeds.INITIAL_SPECIALITIES);
+      await kvSet(supabase, 'mediflow_seeded', 'true');
       return { success: true, message: 'Database reseeded successfully.' };
     }
 
@@ -92,19 +107,14 @@ async function executeDbAction(action, payload) {
     case 'saveClinic': {
       const clinics = await getList('mediflow_clinics');
       const index = clinics.findIndex(c => c.id === payload.id);
-      if (index > -1) {
-        clinics[index] = { ...clinics[index], ...payload };
-      } else {
-        clinics.push(payload);
-      }
+      if (index > -1) { clinics[index] = { ...clinics[index], ...payload }; } else { clinics.push(payload); }
       await saveList('mediflow_clinics', clinics);
       return payload;
     }
 
     case 'deleteClinic': {
       const clinics = await getList('mediflow_clinics');
-      const filtered = clinics.filter(c => c.id !== payload.id);
-      await saveList('mediflow_clinics', filtered);
+      await saveList('mediflow_clinics', clinics.filter(c => c.id !== payload.id));
       return { success: true };
     }
 
@@ -114,19 +124,14 @@ async function executeDbAction(action, payload) {
     case 'saveUser': {
       const users = await getList('mediflow_users');
       const index = users.findIndex(u => u.username === payload.username);
-      if (index > -1) {
-        users[index] = { ...users[index], ...payload };
-      } else {
-        users.push(payload);
-      }
+      if (index > -1) { users[index] = { ...users[index], ...payload }; } else { users.push(payload); }
       await saveList('mediflow_users', users);
       return payload;
     }
 
     case 'deleteUser': {
       const users = await getList('mediflow_users');
-      const filtered = users.filter(u => u.username !== payload.username);
-      await saveList('mediflow_users', filtered);
+      await saveList('mediflow_users', users.filter(u => u.username !== payload.username));
       return { success: true };
     }
 
@@ -138,11 +143,7 @@ async function executeDbAction(action, payload) {
     case 'savePatient': {
       const patients = await getList('mediflow_patients');
       const index = patients.findIndex(p => p.id === payload.id && p.clinicId === payload.clinicId);
-      if (index > -1) {
-        patients[index] = { ...patients[index], ...payload };
-      } else {
-        patients.push(payload);
-      }
+      if (index > -1) { patients[index] = { ...patients[index], ...payload }; } else { patients.push(payload); }
       await saveList('mediflow_patients', patients);
       return payload;
     }
@@ -155,11 +156,7 @@ async function executeDbAction(action, payload) {
     case 'saveVitals': {
       const vitals = await getList('mediflow_vitals');
       const index = vitals.findIndex(v => v.patientId === payload.patientId && v.clinicId === payload.clinicId);
-      if (index > -1) {
-        vitals[index] = { ...vitals[index], ...payload };
-      } else {
-        vitals.push(payload);
-      }
+      if (index > -1) { vitals[index] = { ...vitals[index], ...payload }; } else { vitals.push(payload); }
       await saveList('mediflow_vitals', vitals);
       return payload;
     }
@@ -172,19 +169,14 @@ async function executeDbAction(action, payload) {
     case 'saveTemplate': {
       const templates = await getList('mediflow_templates');
       const index = templates.findIndex(t => t.id === payload.id);
-      if (index > -1) {
-        templates[index] = { ...templates[index], ...payload };
-      } else {
-        templates.push(payload);
-      }
+      if (index > -1) { templates[index] = { ...templates[index], ...payload }; } else { templates.push(payload); }
       await saveList('mediflow_templates', templates);
       return payload;
     }
 
     case 'deleteTemplate': {
       const templates = await getList('mediflow_templates');
-      const filtered = templates.filter(t => t.id !== payload.id);
-      await saveList('mediflow_templates', filtered);
+      await saveList('mediflow_templates', templates.filter(t => t.id !== payload.id));
       return { success: true };
     }
 
@@ -196,19 +188,14 @@ async function executeDbAction(action, payload) {
     case 'saveDrug': {
       const drugs = await getList('mediflow_drugs');
       const index = drugs.findIndex(d => d.id === payload.id);
-      if (index > -1) {
-        drugs[index] = { ...drugs[index], ...payload };
-      } else {
-        drugs.push(payload);
-      }
+      if (index > -1) { drugs[index] = { ...drugs[index], ...payload }; } else { drugs.push(payload); }
       await saveList('mediflow_drugs', drugs);
       return payload;
     }
 
     case 'deleteDrug': {
       const drugs = await getList('mediflow_drugs');
-      const filtered = drugs.filter(d => d.id !== payload.id);
-      await saveList('mediflow_drugs', filtered);
+      await saveList('mediflow_drugs', drugs.filter(d => d.id !== payload.id));
       return { success: true };
     }
 
@@ -220,19 +207,14 @@ async function executeDbAction(action, payload) {
     case 'saveTest': {
       const tests = await getList('mediflow_tests');
       const index = tests.findIndex(t => t.id === payload.id);
-      if (index > -1) {
-        tests[index] = { ...tests[index], ...payload };
-      } else {
-        tests.push(payload);
-      }
+      if (index > -1) { tests[index] = { ...tests[index], ...payload }; } else { tests.push(payload); }
       await saveList('mediflow_tests', tests);
       return payload;
     }
 
     case 'deleteTest': {
       const tests = await getList('mediflow_tests');
-      const filtered = tests.filter(t => t.id !== payload.id);
-      await saveList('mediflow_tests', filtered);
+      await saveList('mediflow_tests', tests.filter(t => t.id !== payload.id));
       return { success: true };
     }
 
@@ -244,19 +226,14 @@ async function executeDbAction(action, payload) {
     case 'saveAdvice': {
       const advice = await getList('mediflow_advice');
       const index = advice.findIndex(a => a.id === payload.id);
-      if (index > -1) {
-        advice[index] = { ...advice[index], ...payload };
-      } else {
-        advice.push(payload);
-      }
+      if (index > -1) { advice[index] = { ...advice[index], ...payload }; } else { advice.push(payload); }
       await saveList('mediflow_advice', advice);
       return payload;
     }
 
     case 'deleteAdvice': {
       const advice = await getList('mediflow_advice');
-      const filtered = advice.filter(a => a.id !== payload.id);
-      await saveList('mediflow_advice', filtered);
+      await saveList('mediflow_advice', advice.filter(a => a.id !== payload.id));
       return { success: true };
     }
 
@@ -268,19 +245,14 @@ async function executeDbAction(action, payload) {
     case 'saveAppointment': {
       const appointments = await getList('mediflow_appointments');
       const index = appointments.findIndex(a => a.id === payload.id);
-      if (index > -1) {
-        appointments[index] = { ...appointments[index], ...payload };
-      } else {
-        appointments.push(payload);
-      }
+      if (index > -1) { appointments[index] = { ...appointments[index], ...payload }; } else { appointments.push(payload); }
       await saveList('mediflow_appointments', appointments);
       return payload;
     }
 
     case 'deleteAppointment': {
       const appointments = await getList('mediflow_appointments');
-      const filtered = appointments.filter(a => a.id !== payload.id);
-      await saveList('mediflow_appointments', filtered);
+      await saveList('mediflow_appointments', appointments.filter(a => a.id !== payload.id));
       return { success: true };
     }
 
@@ -292,11 +264,7 @@ async function executeDbAction(action, payload) {
     case 'saveBill': {
       const bills = await getList('mediflow_bills');
       const index = bills.findIndex(b => b.id === payload.id);
-      if (index > -1) {
-        bills[index] = { ...bills[index], ...payload };
-      } else {
-        bills.push(payload);
-      }
+      if (index > -1) { bills[index] = { ...bills[index], ...payload }; } else { bills.push(payload); }
       await saveList('mediflow_bills', bills);
       return payload;
     }
@@ -309,11 +277,7 @@ async function executeDbAction(action, payload) {
     case 'saveInsurance': {
       const insurance = await getList('mediflow_insurance');
       const index = insurance.findIndex(i => i.id === payload.id);
-      if (index > -1) {
-        insurance[index] = { ...insurance[index], ...payload };
-      } else {
-        insurance.push(payload);
-      }
+      if (index > -1) { insurance[index] = { ...insurance[index], ...payload }; } else { insurance.push(payload); }
       await saveList('mediflow_insurance', insurance);
       return payload;
     }
@@ -326,11 +290,7 @@ async function executeDbAction(action, payload) {
     case 'saveAttendance': {
       const attendance = await getList('mediflow_attendance');
       const index = attendance.findIndex(a => a.id === payload.id);
-      if (index > -1) {
-        attendance[index] = { ...attendance[index], ...payload };
-      } else {
-        attendance.push(payload);
-      }
+      if (index > -1) { attendance[index] = { ...attendance[index], ...payload }; } else { attendance.push(payload); }
       await saveList('mediflow_attendance', attendance);
       return payload;
     }
@@ -346,11 +306,7 @@ async function executeDbAction(action, payload) {
     case 'savePatientAccount': {
       const accounts = await getList('mediflow_patient_accounts');
       const index = accounts.findIndex(a => a.id === payload.id);
-      if (index > -1) {
-        accounts[index] = { ...accounts[index], ...payload };
-      } else {
-        accounts.push(payload);
-      }
+      if (index > -1) { accounts[index] = { ...accounts[index], ...payload }; } else { accounts.push(payload); }
       await saveList('mediflow_patient_accounts', accounts);
       return payload;
     }
@@ -368,34 +324,24 @@ async function executeDbAction(action, payload) {
     case 'saveDoctorSlotConfig': {
       const slots = await getList('mediflow_doctor_slots');
       const index = slots.findIndex(s => s.doctorUsername === payload.doctorUsername && s.clinicId === payload.clinicId);
-      if (index > -1) {
-        slots[index] = { ...slots[index], ...payload };
-      } else {
-        slots.push(payload);
-      }
+      if (index > -1) { slots[index] = { ...slots[index], ...payload }; } else { slots.push(payload); }
       await saveList('mediflow_doctor_slots', slots);
       return payload;
     }
 
     case 'getPrescriptions': {
       const prescriptions = await getList('mediflow_prescriptions');
-      if (payload.clinicId && payload.patientId) {
+      if (payload.clinicId && payload.patientId)
         return prescriptions.filter(p => p.clinicId === payload.clinicId && p.patientId === payload.patientId);
-      }
-      if (payload.clinicId) {
+      if (payload.clinicId)
         return prescriptions.filter(p => p.clinicId === payload.clinicId);
-      }
       return prescriptions;
     }
 
     case 'savePrescription': {
       const prescriptions = await getList('mediflow_prescriptions');
       const index = prescriptions.findIndex(p => p.id === payload.id);
-      if (index > -1) {
-        prescriptions[index] = { ...prescriptions[index], ...payload };
-      } else {
-        prescriptions.push(payload);
-      }
+      if (index > -1) { prescriptions[index] = { ...prescriptions[index], ...payload }; } else { prescriptions.push(payload); }
       await saveList('mediflow_prescriptions', prescriptions);
       return payload;
     }
@@ -418,19 +364,14 @@ async function executeDbAction(action, payload) {
     case 'saveDrugCategory': {
       const categories = await getList('mediflow_drug_categories');
       const index = categories.findIndex(c => c.id === payload.id);
-      if (index > -1) {
-        categories[index] = { ...categories[index], ...payload };
-      } else {
-        categories.push(payload);
-      }
+      if (index > -1) { categories[index] = { ...categories[index], ...payload }; } else { categories.push(payload); }
       await saveList('mediflow_drug_categories', categories);
       return payload;
     }
 
     case 'deleteDrugCategory': {
       const categories = await getList('mediflow_drug_categories');
-      const filtered = categories.filter(c => c.id !== payload.id);
-      await saveList('mediflow_drug_categories', filtered);
+      await saveList('mediflow_drug_categories', categories.filter(c => c.id !== payload.id));
       return { success: true };
     }
 
@@ -442,35 +383,22 @@ async function executeDbAction(action, payload) {
     case 'saveSpeciality': {
       const specs = await getList('mediflow_specialities');
       const { clinicId, name, icon, oldName } = payload;
-      
       if (oldName) {
         const index = specs.findIndex(s => s.clinicId === clinicId && s.name.toLowerCase() === oldName.toLowerCase());
-        if (index > -1) {
-          specs[index] = { clinicId, name, icon };
-        } else {
-          specs.push({ clinicId, name, icon });
-        }
-        
+        if (index > -1) { specs[index] = { clinicId, name, icon }; } else { specs.push({ clinicId, name, icon }); }
         if (oldName.toLowerCase() !== name.toLowerCase()) {
           const users = await getList('mediflow_users');
           let updated = false;
           users.forEach(u => {
             if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality && u.speciality.toLowerCase() === oldName.toLowerCase()) {
-              u.speciality = name;
-              updated = true;
+              u.speciality = name; updated = true;
             }
           });
-          if (updated) {
-            await saveList('mediflow_users', users);
-          }
+          if (updated) await saveList('mediflow_users', users);
         }
       } else {
         const index = specs.findIndex(s => s.clinicId === clinicId && s.name.toLowerCase() === name.toLowerCase());
-        if (index > -1) {
-          specs[index] = { clinicId, name, icon };
-        } else {
-          specs.push({ clinicId, name, icon });
-        }
+        if (index > -1) { specs[index] = { clinicId, name, icon }; } else { specs.push({ clinicId, name, icon }); }
       }
       await saveList('mediflow_specialities', specs);
       return payload;
@@ -479,35 +407,25 @@ async function executeDbAction(action, payload) {
     case 'deleteSpeciality': {
       const specs = await getList('mediflow_specialities');
       const { clinicId, name } = payload;
-      const filtered = specs.filter(s => !(s.clinicId === clinicId && s.name.toLowerCase() === name.toLowerCase()));
-      await saveList('mediflow_specialities', filtered);
-      
+      await saveList('mediflow_specialities', specs.filter(s => !(s.clinicId === clinicId && s.name.toLowerCase() === name.toLowerCase())));
       const users = await getList('mediflow_users');
       let updated = false;
       users.forEach(u => {
         if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality && u.speciality.toLowerCase() === name.toLowerCase()) {
-          u.speciality = '';
-          updated = true;
+          u.speciality = ''; updated = true;
         }
       });
-      if (updated) {
-        await saveList('mediflow_users', users);
-      }
+      if (updated) await saveList('mediflow_users', users);
       return { success: true };
     }
 
-    // --- Inquiries (Prospective Clinic Inquiries) ---
     case 'getInquiries':
       return await getList('mediflow_inquiries');
 
     case 'saveInquiry': {
       const inquiries = await getList('mediflow_inquiries');
-      if (!payload.id) {
-        payload.id = 'inq-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-      }
-      if (!payload.timestamp) {
-        payload.timestamp = new Date().toISOString();
-      }
+      if (!payload.id) payload.id = 'inq-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      if (!payload.timestamp) payload.timestamp = new Date().toISOString();
       inquiries.push(payload);
       await saveList('mediflow_inquiries', inquiries);
       return payload;
@@ -515,71 +433,52 @@ async function executeDbAction(action, payload) {
 
     case 'deleteInquiry': {
       const inquiries = await getList('mediflow_inquiries');
-      const filtered = inquiries.filter(i => i.id !== payload.id);
-      await saveList('mediflow_inquiries', filtered);
+      await saveList('mediflow_inquiries', inquiries.filter(i => i.id !== payload.id));
       return { success: true };
     }
 
     default:
-      throw new Error(`Unknown Vercel Database operation: ${action}`);
+      throw new Error(`Unknown database operation: ${action}`);
   }
 }
 
 // Serverless Handler Router
 module.exports = async (req, res) => {
-  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
   const path = req.url.split('?')[0];
 
-  // 1. Health
+  // 1. Health check
   if (path.endsWith('/health')) {
-    return res.status(200).json({ status: 'ok', message: 'MediFlow Clinical API Router Online' });
+    return res.status(200).json({ status: 'ok', message: 'MediFlow API Online (Supabase)' });
   }
 
-  // 2. Vercel Blobs
+  // 2. Vercel Blobs (logo upload — kept as-is)
   if (path.endsWith('/blobs')) {
     try {
       if (req.method === 'GET') {
         const clinicId = req.query.clinicId;
-        if (!clinicId) {
-          return res.status(400).json({ error: 'clinicId is required' });
-        }
-        const url = await kv.get(`mediflow_header_${clinicId}`);
+        if (!clinicId) return res.status(400).json({ error: 'clinicId is required' });
+        // Fetch logo URL stored in Supabase
+        const supabase = getSupabase();
+        const url = await kvGet(supabase, `mediflow_header_${clinicId}`);
         return res.status(200).json({ url: url || '' });
       }
-
       if (req.method === 'POST') {
         const { clinicId, dataUrl } = req.body;
-        if (!clinicId || !dataUrl) {
-          return res.status(400).json({ error: 'clinicId and dataUrl are required' });
-        }
-
+        if (!clinicId || !dataUrl) return res.status(400).json({ error: 'clinicId and dataUrl are required' });
         const parts = dataUrl.split(';base64,');
         const contentType = parts[0].split(':')[1];
         const base64Data = parts[1];
         const buffer = Buffer.from(base64Data, 'base64');
-
-        // Store to Vercel Blob
-        const blob = await put(`logos/${clinicId}.png`, buffer, {
-          access: 'public',
-          contentType
-        });
-
-        // Store KV reference
-        await kv.set(`mediflow_header_${clinicId}`, blob.url);
-
+        const blob = await put(`logos/${clinicId}.png`, buffer, { access: 'public', contentType });
+        const supabase = getSupabase();
+        await kvSet(supabase, `mediflow_header_${clinicId}`, blob.url);
         return res.status(200).json({ success: true, url: blob.url });
       }
     } catch (err) {
@@ -587,21 +486,22 @@ module.exports = async (req, res) => {
     }
   }
 
-  // 3. Vercel KV Database
+  // 3. Supabase Database
   if (path.endsWith('/db')) {
     try {
       const { action, payload } = req.body;
-      const hasDbConfig = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+      const hasDbConfig = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
       if (action === 'check') {
         return res.status(200).json({ cloudActive: hasDbConfig });
       }
 
       if (!hasDbConfig) {
-        return res.status(503).json({ error: 'Vercel KV config missing' });
+        return res.status(503).json({ error: 'Supabase config missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in Vercel Environment Variables.' });
       }
 
-      const data = await executeDbAction(action, payload);
+      const supabase = getSupabase();
+      const data = await executeDbAction(supabase, action, payload);
       return res.status(200).json({ data });
     } catch (err) {
       return res.status(500).json({ error: 'Database operation failed', message: err.message });
