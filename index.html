@@ -501,6 +501,7 @@
           </tbody>
         </table>
       </div>
+    </div>
     
     <!-- Panel 7: Specialities Management -->
     <div id="panel-cadmin-specialities" class="glass-panel hidden">
@@ -1342,6 +1343,9 @@
           <div class="form-group">
             <label for="speciality-form-icon">Icon (Emoji or single character)</label>
             <input type="text" id="speciality-form-icon" class="form-control" required placeholder="e.g. 🩺, 🦷, 👁️">
+            <small class="text-muted" style="display:block; margin-top:0.35rem; font-size:0.8rem;">
+              Tip: You can copy-paste emojis from <a href="https://emojipedia.org" target="_blank" rel="noopener noreferrer" style="color:var(--accent-color); text-decoration:underline;">Emojipedia</a>
+            </small>
           </div>
         </div>
         <div class="modal-footer">
@@ -2621,18 +2625,81 @@
           </div>
           
           <div class="form-group">
-            <label for="settings-current-password">Current Password</label>
-            <input type="password" id="settings-current-password" class="form-control" required placeholder="••••••••">
+            <label for="settings-current-password">Current Password (Required for password changes)</label>
+            <input type="password" id="settings-current-password" class="form-control" placeholder="••••••••">
           </div>
           
           <div class="form-group">
             <label for="settings-new-password">New Password</label>
-            <input type="password" id="settings-new-password" class="form-control" required placeholder="••••••••">
+            <input type="password" id="settings-new-password" class="form-control" placeholder="••••••••">
           </div>
 
           <div class="form-group">
             <label for="settings-confirm-password">Confirm New Password</label>
-            <input type="password" id="settings-confirm-password" class="form-control" required placeholder="••••••••">
+            <input type="password" id="settings-confirm-password" class="form-control" placeholder="••••••••">
+          </div>
+
+          <!-- Theme Customization Section -->
+          <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+            <h4 style="margin-bottom: 1rem; font-family: var(--font-heading); font-size: 1rem; display:flex; align-items:center; gap:0.4rem;">🎨 App Theme Settings</h4>
+            
+            <div class="form-group">
+              <label for="settings-theme-preset">Theme Preset</label>
+              <select id="settings-theme-preset" class="form-control" onchange="toggleCustomThemeControls()">
+                <option value="indigo">Indigo Dream (Dark - Default)</option>
+                <option value="indigo-light">Indigo Dream (Light)</option>
+                <option value="teal">Forest Clinic (Dark)</option>
+                <option value="teal-light">Forest Clinic (Light)</option>
+                <option value="ocean">Ocean Breeze (Dark)</option>
+                <option value="ocean-light">Ocean Breeze (Light)</option>
+                <option value="rose">Crimson Care (Dark)</option>
+                <option value="rose-light">Crimson Care (Light)</option>
+                <option value="slate">Sleek Slate (Dark)</option>
+                <option value="slate-light">Sleek Slate (Light)</option>
+                <option value="custom">— Custom Colors —</option>
+              </select>
+            </div>
+
+            <div id="settings-custom-theme-controls" class="hidden" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+              <div class="form-group" style="margin:0;">
+                <label for="settings-theme-accent">Custom Accent Color</label>
+                <input type="color" id="settings-theme-accent" class="form-control" style="height: 45px; padding: 2px; cursor: pointer; border: 1px solid var(--border-color);" value="#6366f1">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="settings-theme-mode">Custom Base Style</label>
+                <select id="settings-theme-mode" class="form-control">
+                  <option value="dark">Dark Theme Base</option>
+                  <option value="light">Light Theme Base</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Background Image Customization Section -->
+          <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+            <h4 style="margin-bottom: 1rem; font-family: var(--font-heading); font-size: 1rem; display:flex; align-items:center; gap:0.4rem;">🖼️ App Background Settings</h4>
+            
+            <div class="form-group">
+              <label for="settings-bg-type">Background Wallpaper</label>
+              <select id="settings-bg-type" class="form-control" onchange="toggleCustomBgControls()">
+                <option value="none">Default Solid Background</option>
+                <option value="blue-grad">Calming Blue Gradient (Preset)</option>
+                <option value="medical-lines">Abstract Science Lines (Preset)</option>
+                <option value="subtle-clinic">Subtle Blurred Clinic (Preset)</option>
+                <option value="serene-landscape">Calming Landscape (Preset)</option>
+                <option value="custom">— Custom Wallpaper URL —</option>
+              </select>
+            </div>
+
+            <div id="settings-custom-bg-controls" class="hidden" style="margin-top:1rem;">
+              <div class="form-group" style="margin:0;">
+                <label for="settings-bg-custom-url">Custom Wallpaper Image URL</label>
+                <input type="url" id="settings-bg-custom-url" class="form-control" placeholder="https://example.com/image.jpg">
+                <small class="text-muted" style="display:block; margin-top:0.25rem; font-size:0.75rem;">
+                  Paste a direct link to any public image URL.
+                </small>
+              </div>
+            </div>
           </div>
           
           <div class="alert alert-danger hidden" id="settings-error" style="color:var(--error); font-size:0.85rem; margin-top:0.5rem;">
@@ -2809,7 +2876,7 @@
             Are you a clinic administrator or doctor interested in deploying MediFlow at your facility? Fill out the details below. Our platform administrator will register your sandbox and get back to you shortly.
           </p>
           <form id="inquiry-form" onsubmit="handleInquirySubmit(event)">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div class="form-row" style="margin-bottom:1rem;">
               <div class="form-group" style="margin:0;">
                 <label for="inq-clinic-name">Clinic Name</label>
                 <input type="text" id="inq-clinic-name" class="form-control" required placeholder="e.g. Care Speciality Clinic">
@@ -2819,7 +2886,7 @@
                 <input type="text" id="inq-contact-name" class="form-control" required placeholder="e.g. Dr. Amit Sharma">
               </div>
             </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div class="form-row" style="margin-bottom:1rem;">
               <div class="form-group" style="margin:0;">
                 <label for="inq-email">Email Address</label>
                 <input type="email" id="inq-email" class="form-control" required placeholder="e.g. contact@clinic.com">

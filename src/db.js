@@ -550,7 +550,7 @@ class DB {
             const users = getList('mediflow_users');
             let updated = false;
             users.forEach(u => {
-              if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality === oldName) {
+              if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality && u.speciality.toLowerCase() === oldName.toLowerCase()) {
                 u.speciality = name;
                 updated = true;
               }
@@ -581,7 +581,7 @@ class DB {
         const users = getList('mediflow_users');
         let updated = false;
         users.forEach(u => {
-          if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality === name) {
+          if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality && u.speciality.toLowerCase() === name.toLowerCase()) {
             u.speciality = '';
             updated = true;
           }

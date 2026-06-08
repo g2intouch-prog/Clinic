@@ -398,10 +398,12 @@ async function handleLogout() {
   selectedAdvice = [];
   teardownClinicChat();
   sessionStorage.removeItem('mediflow_session');
+  applyTheme(null);
   showView('view-login');
 }
 
 async function loginSuccess(user) {
+  applyTheme(user.theme);
   // Enforce database-assigned clinicId for non-superadmin users to prevent sessionStorage hijacking
   if (user.role !== 'admin') {
     const dbUsers = await DB.request('getUsers');
@@ -991,6 +993,7 @@ async function loadDoctorConfigs() {
   doctorDrugCategories = await DB.request('getDrugCategories', reqArgs);
 
   populateDoctorDrugCategoryDropdowns();
+  await populateDoctorSpecialtyDropdowns();
 
   renderDoctorTemplates();
   renderDoctorDrugs();
@@ -1015,6 +1018,41 @@ function populateDoctorDrugCategoryDropdowns() {
   
   if (selectModal) {
     selectModal.innerHTML = doctorDrugCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }
+}
+
+async function populateDoctorSpecialtyDropdowns() {
+  const selectFilter = document.getElementById('specialty-selector');
+  const selectModal = document.getElementById('doc-item-specialty');
+  
+  if (!selectFilter && !selectModal) return;
+  
+  const specs = await DB.request('getSpecialities', { clinicId: currentUser.clinicId });
+  const items = specs.length > 0 ? specs : [
+    { name: 'General Medicine', icon: '🩺' },
+    { name: 'ENT', icon: '👂' },
+    { name: 'Dental', icon: '🦷' },
+    { name: 'Dermatology', icon: '🧴' },
+    { name: 'Ophthalmology', icon: '👁️' },
+    { name: 'Orthopaedics', icon: '🦴' },
+    { name: 'Gynaecology', icon: '👩‍⚕️' },
+    { name: 'Paediatrics', icon: '👶' },
+    { name: 'Cardiology', icon: '❤️' },
+    { name: 'Neurology', icon: '🧠' }
+  ];
+  
+  if (selectFilter) {
+    const prevVal = selectFilter.value;
+    selectFilter.innerHTML = items.map(s => `<option value="${s.name}">${s.icon} ${s.name}</option>`).join('');
+    if (items.some(s => s.name === prevVal)) {
+      selectFilter.value = prevVal;
+    } else if (items.length > 0) {
+      selectFilter.value = items[0].name;
+    }
+  }
+  
+  if (selectModal) {
+    selectModal.innerHTML = items.map(s => `<option value="${s.name}">${s.icon} ${s.name}</option>`).join('');
   }
 }
 
@@ -2449,7 +2487,7 @@ window.renderCadminSpecialities = async function() {
     tr.innerHTML = `
       <td style="font-weight:600; color:var(--text-main);">${s.name}</td>
       <td style="font-size:1.5rem; text-align:center; width: 100px;">${s.icon}</td>
-      <td style="width: 180px; text-align: right;">
+      <td style="width: 180px; text-align: right; white-space: nowrap;">
         <button class="btn btn-secondary btn-sm" onclick="openEditSpecialityModal('${s.name}', '${s.icon}')" style="margin-right:0.25rem;">✏️ Edit</button>
         <button class="btn btn-secondary btn-sm btn-danger" onclick="deleteCadminSpeciality('${s.name}')">🗑️ Delete</button>
       </td>
@@ -4366,6 +4404,7 @@ async function handlePatientSignin() {
 
   portalAccount = account;
   sessionStorage.setItem('mediflow_patient_session', JSON.stringify(account));
+  applyTheme(account.theme);
   showPortalToast('Signed in successfully!', 'success');
   setTimeout(() => {
     if (!account.clinicId) {
@@ -4380,11 +4419,13 @@ function portalLogout() {
   portalAccount = null;
   portalClinic  = null;
   sessionStorage.removeItem('mediflow_patient_session');
+  applyTheme(null);
   portalGoLanding();
 }
 
 function portalSessionRestore(account) {
   portalAccount = account;
+  applyTheme(account.theme);
   if (!account.clinicId) {
     showClinicSelector(false);
   } else {
@@ -5404,7 +5445,169 @@ window.showClinicLogin        = showClinicLogin;
 window.confirmClinicAdminLogin = confirmClinicAdminLogin;
 window.openTutorialModal      = openTutorialModal;
 
-// --- PROFILE SETTINGS MODULE ---
+// --- PROFILE SETTINGS & THEME CUSTOMIZATION MODULE ---
+window.toggleCustomThemeControls = function() {
+  const preset = document.getElementById('settings-theme-preset').value;
+  const controls = document.getElementById('settings-custom-theme-controls');
+  if (preset === 'custom') {
+    controls.classList.remove('hidden');
+  } else {
+    controls.classList.add('hidden');
+  }
+};
+
+window.toggleCustomBgControls = function() {
+  const bgType = document.getElementById('settings-bg-type').value;
+  const controls = document.getElementById('settings-custom-bg-controls');
+  if (bgType === 'custom') {
+    controls.classList.remove('hidden');
+  } else {
+    controls.classList.add('hidden');
+  }
+};
+
+window.applyTheme = function(themeConfig) {
+  let styleEl = document.getElementById('custom-user-theme');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'custom-user-theme';
+    document.head.appendChild(styleEl);
+  }
+  
+  if (!themeConfig) {
+    styleEl.innerHTML = '';
+    // Restore general light/dark mode preference
+    if (localStorage.getItem('mediflow_light_theme') === 'true') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+    return;
+  }
+  
+  const presets = {
+    'indigo': { accent: '#6366f1', hover: '#4f46e5', mode: 'dark' },
+    'indigo-light': { accent: '#6366f1', hover: '#4f46e5', mode: 'light' },
+    'teal': { accent: '#14b8a6', hover: '#0d9488', mode: 'dark' },
+    'teal-light': { accent: '#14b8a6', hover: '#0d9488', mode: 'light' },
+    'ocean': { accent: '#0ea5e9', hover: '#0284c7', mode: 'dark' },
+    'ocean-light': { accent: '#0ea5e9', hover: '#0284c7', mode: 'light' },
+    'rose': { accent: '#f43f5e', hover: '#e11d48', mode: 'dark' },
+    'rose-light': { accent: '#f43f5e', hover: '#e11d48', mode: 'light' },
+    'slate': { accent: '#64748b', hover: '#475569', mode: 'dark' },
+    'slate-light': { accent: '#64748b', hover: '#475569', mode: 'light' }
+  };
+
+  let accent = '';
+  let hover = '';
+  let mode = themeConfig.mode || 'dark';
+
+  if (themeConfig.preset && themeConfig.preset !== 'custom') {
+    const config = presets[themeConfig.preset];
+    if (config) {
+      accent = config.accent;
+      hover = config.hover;
+      mode = config.mode;
+    }
+  } else if (themeConfig.preset === 'custom') {
+    accent = themeConfig.accentColor || '#6366f1';
+    hover = adjustColorBrightness(accent, -15);
+    mode = themeConfig.mode || 'dark';
+  }
+
+  // Background Wallpaper Configuration
+  const bgImagePresets = {
+    'none': '',
+    'blue-grad': 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80',
+    'medical-lines': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1200&q=80',
+    'subtle-clinic': 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1200&q=80',
+    'serene-landscape': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80'
+  };
+
+  let bgUrl = '';
+  if (themeConfig.bgType && themeConfig.bgType !== 'none') {
+    if (themeConfig.bgType === 'custom') {
+      bgUrl = themeConfig.customBgUrl || '';
+    } else {
+      bgUrl = bgImagePresets[themeConfig.bgType] || '';
+    }
+  }
+
+  let styleContent = '';
+  if (accent) {
+    const accentGlow = mode === 'light' ? `${accent}14` : `${accent}26`;
+    styleContent += `
+      :root {
+        --accent-color: ${accent} !important;
+        --accent-hover: ${hover} !important;
+        --accent-glow: ${accentGlow} !important;
+        
+        --admin-color: ${accent} !important;
+        --cadmin-color: ${accent} !important;
+        --staff-color: ${accent} !important;
+        --doctor-color: ${accent} !important;
+      }
+    `;
+  }
+
+  if (bgUrl) {
+    const overlayColor = mode === 'light' ? 'rgba(241,245,249,0.88)' : 'rgba(11,15,25,0.91)';
+    styleContent += `
+      body {
+        background-image: linear-gradient(${overlayColor}, ${overlayColor}), url("${bgUrl}") !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-attachment: fixed !important;
+        background-repeat: no-repeat !important;
+      }
+      .bg-glow, .bg-glow-2 {
+        display: none !important;
+      }
+    `;
+  } else {
+    styleContent += `
+      body {
+        background-image: none !important;
+      }
+      .bg-glow, .bg-glow-2 {
+        display: block !important;
+      }
+    `;
+  }
+
+  styleEl.innerHTML = styleContent;
+
+  if (mode === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+};
+
+function adjustColorBrightness(hex, percent) {
+  let R = parseInt(hex.substring(1, 3), 16);
+  let G = parseInt(hex.substring(3, 5), 16);
+  let B = parseInt(hex.substring(5, 7), 16);
+
+  R = parseInt(R * (100 + percent) / 100);
+  G = parseInt(G * (100 + percent) / 100);
+  B = parseInt(B * (100 + percent) / 100);
+
+  R = (R < 255) ? R : 255;
+  G = (G < 255) ? G : 255;
+  B = (B < 255) ? B : 255;
+
+  R = (R > 0) ? R : 0;
+  G = (G > 0) ? G : 0;
+  B = (B > 0) ? B : 0;
+
+  const rHex = R.toString(16).padStart(2, '0');
+  const gHex = G.toString(16).padStart(2, '0');
+  const bHex = B.toString(16).padStart(2, '0');
+
+  return `#${rHex}${gHex}${bHex}`;
+}
+
 function openProfileSettingsModal() {
   document.getElementById('profile-settings-form').reset();
   const errorDiv = document.getElementById('settings-error');
@@ -5422,6 +5625,16 @@ function openProfileSettingsModal() {
     }
   }
 
+  // Populate theme settings
+  const theme = (currentUser && currentUser.theme) || (portalAccount && portalAccount.theme) || { preset: 'indigo', accentColor: '#6366f1', mode: 'dark', bgType: 'none', customBgUrl: '' };
+  document.getElementById('settings-theme-preset').value = theme.preset || 'indigo';
+  document.getElementById('settings-theme-accent').value = theme.accentColor || '#6366f1';
+  document.getElementById('settings-theme-mode').value = theme.mode || 'dark';
+  document.getElementById('settings-bg-type').value = theme.bgType || 'none';
+  document.getElementById('settings-bg-custom-url').value = theme.customBgUrl || '';
+  toggleCustomThemeControls();
+  toggleCustomBgControls();
+
   openModal('modal-profile-settings');
 }
 
@@ -5433,17 +5646,28 @@ async function handleProfileSettingsSubmit(e) {
   const confirmPasswordInput = document.getElementById('settings-confirm-password').value;
   const errorDiv = document.getElementById('settings-error');
   
-  if (newPasswordInput !== confirmPasswordInput) {
-    errorDiv.textContent = "New passwords do not match!";
-    errorDiv.classList.remove('hidden');
-    return;
-  }
+  const preset = document.getElementById('settings-theme-preset').value;
+  const accentColor = document.getElementById('settings-theme-accent').value;
+  const mode = document.getElementById('settings-theme-mode').value;
+  
+  const bgType = document.getElementById('settings-bg-type').value;
+  const customBgUrl = document.getElementById('settings-bg-custom-url').value.trim();
+  
+  const themeConfig = { preset, accentColor, mode, bgType, customBgUrl };
 
   if (currentUser) {
-    if (currentUser.password !== currentPasswordInput) {
-      errorDiv.textContent = "Current password is incorrect!";
-      errorDiv.classList.remove('hidden');
-      return;
+    if (newPasswordInput || currentPasswordInput || confirmPasswordInput) {
+      if (newPasswordInput !== confirmPasswordInput) {
+        errorDiv.textContent = "New passwords do not match!";
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      if (currentUser.password !== currentPasswordInput) {
+        errorDiv.textContent = "Current password is incorrect!";
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      currentUser.password = newPasswordInput;
     }
 
     if (currentUser.role === 'admin') {
@@ -5467,37 +5691,46 @@ async function handleProfileSettingsSubmit(e) {
       }
 
       currentUser.username = newUsername;
-      currentUser.password = newPasswordInput;
-
       if (newUsername !== oldUsername) {
         await DB.request('deleteUser', { username: oldUsername });
       }
+      currentUser.theme = themeConfig;
       await DB.request('saveUser', currentUser);
       sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
       
       // Update nav username
       document.getElementById('nav-user-name').textContent = `${currentUser.name} (Super Admin)`;
     } else {
-      currentUser.password = newPasswordInput;
+      currentUser.theme = themeConfig;
       await DB.request('saveUser', currentUser);
       sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
     }
 
+    applyTheme(currentUser.theme);
     closeModal('modal-profile-settings');
     alert("Settings updated successfully!");
   } else if (portalAccount) {
-    if (portalAccount.password !== currentPasswordInput) {
-      errorDiv.textContent = "Current password is incorrect!";
-      errorDiv.classList.remove('hidden');
-      return;
+    if (newPasswordInput || currentPasswordInput || confirmPasswordInput) {
+      if (newPasswordInput !== confirmPasswordInput) {
+        errorDiv.textContent = "New passwords do not match!";
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      if (portalAccount.password !== currentPasswordInput) {
+        errorDiv.textContent = "Current password is incorrect!";
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      portalAccount.password = newPasswordInput;
     }
 
-    portalAccount.password = newPasswordInput;
+    portalAccount.theme = themeConfig;
     await DB.request('savePatientAccount', portalAccount);
     sessionStorage.setItem('mediflow_patient_session', JSON.stringify(portalAccount));
 
+    applyTheme(portalAccount.theme);
     closeModal('modal-profile-settings');
-    showPortalToast("Password updated successfully!", "success");
+    showPortalToast("Settings updated successfully!", "success");
   } else {
     closeModal('modal-profile-settings');
     alert("Error: No active session detected.");

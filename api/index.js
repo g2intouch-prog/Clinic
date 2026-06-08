@@ -410,7 +410,7 @@ async function executeDbAction(action, payload) {
           const users = await getList('mediflow_users');
           let updated = false;
           users.forEach(u => {
-            if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality === oldName) {
+            if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality && u.speciality.toLowerCase() === oldName.toLowerCase()) {
               u.speciality = name;
               updated = true;
             }
@@ -440,7 +440,7 @@ async function executeDbAction(action, payload) {
       const users = await getList('mediflow_users');
       let updated = false;
       users.forEach(u => {
-        if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality === name) {
+        if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality && u.speciality.toLowerCase() === name.toLowerCase()) {
           u.speciality = '';
           updated = true;
         }
