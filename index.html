@@ -106,6 +106,9 @@
           <button class="btn btn-secondary btn-sm" onclick="prefillLogin('doctor1', 'password')">🩺 Doctor</button>
         </div>
       </div>
+      <div style="text-align: center; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
+        <a href="#" onclick="openModal('modal-learn-more'); return false;" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500;">🏥 Interested Clinic? Learn More</a>
+      </div>
     </div>
   </main>
 
@@ -144,6 +147,7 @@
       <button class="btn btn-secondary active" id="btn-admin-tab-clinics" onclick="switchSuperAdminTab('clinics')">🏢 Clinics Directory</button>
       <button class="btn btn-secondary" id="btn-admin-tab-admins" onclick="switchSuperAdminTab('admins')">🏥 Clinic Administrators</button>
       <button class="btn btn-secondary" id="btn-admin-tab-payments" onclick="switchSuperAdminTab('payments')">💰 Payments & Ratings</button>
+      <button class="btn btn-secondary" id="btn-admin-tab-inquiries" onclick="switchSuperAdminTab('inquiries')">📩 Prospective Inquiries</button>
     </div>
 
     <!-- Clinic Registry list -->
@@ -200,6 +204,27 @@
               <th>Pricing Rate</th>
               <th>Outstanding Unpaid Dues</th>
               <th>Payment Reliability Rating</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
+    </div>
+
+    <!-- Clinic Inquiries list -->
+    <div id="panel-admin-inquiries" class="glass-panel hidden">
+      <h3 style="margin-bottom: 1rem;">Prospective Clinic Inquiries</h3>
+      <div class="table-wrapper">
+        <table class="custom-table" id="inquiries-table">
+          <thead>
+            <tr>
+              <th>Date/Time</th>
+              <th>Clinic Name</th>
+              <th>Contact Person</th>
+              <th>Contact Details</th>
+              <th>City</th>
+              <th>Message</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -474,7 +499,8 @@
           <tbody>
             <!-- Dynamic Injection -->
           </tbody>
-    </div>
+        </table>
+      </div>
     
     <!-- Panel 7: Specialities Management -->
     <div id="panel-cadmin-specialities" class="glass-panel hidden">
@@ -1929,9 +1955,6 @@
           <button class="btn-hero-primary" id="landing-book-btn" onclick="portalShowAuth('signup')">
             🏥 Book an Appointment
           </button>
-          <button class="btn-hero-secondary" id="landing-clinic-login-btn" onclick="showClinicLogin()">
-            🔐 Clinic Login
-          </button>
         </div>
         <div class="hero-stats">
           <div class="hero-stat-item">
@@ -2022,7 +2045,7 @@
 
     <!-- FOOTER -->
     <footer class="landing-footer">
-      <p>© 2026 MediFlow. All rights reserved. &nbsp;|&nbsp; <a href="#" onclick="showClinicLogin(); return false;">Staff Login</a></p>
+      <p>© 2026 MediFlow. All rights reserved. &nbsp;|&nbsp; <a href="#" onclick="showClinicLogin(); return false;">Staff Login</a> &nbsp;|&nbsp; <a href="#" onclick="openModal('modal-learn-more'); return false;">🏥 Interested Clinic? Learn More</a></p>
     </footer>
   </main>
 
@@ -2621,6 +2644,207 @@
           <button type="submit" class="btn btn-primary">Save Settings</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- modal-learn-more: Clinic Partner / Feature Showcase Modal -->
+  <div class="modal-backdrop hidden" id="modal-learn-more" style="z-index: 1400;">
+    <div class="modal-content" style="max-width: 850px; width: 95%;">
+      <div class="modal-header" style="background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color);">
+        <h3 style="display:flex; align-items:center; gap:0.5rem; font-family:var(--font-heading);">🏥 Partner with MediFlow</h3>
+        <button class="modal-close" onclick="closeModal('modal-learn-more')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 2rem; max-height: 75vh; overflow-y: auto;">
+        
+        <!-- Welcome Section -->
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <h2 style="font-family:var(--font-heading); color:var(--text-main); font-size:1.8rem; margin-bottom:0.5rem;">Supercharge Your Clinic Operations</h2>
+          <p style="color:var(--text-muted); max-width:600px; margin:0 auto; line-height:1.6;">
+            MediFlow is a unified clinic management ecosystem built to digitize appointments, write smart prescriptions, automate patient communications, and streamline billing.
+          </p>
+        </div>
+
+        <!-- Sleek Feature Grid -->
+        <div class="features-popup-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1.25rem; margin-bottom:2.5rem;">
+          <div class="popup-feature-card" style="border: 1px solid var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 1.25rem; transition: var(--transition-smooth);">
+            <div style="font-size: 2rem; margin-bottom: 0.75rem;">📅</div>
+            <h4 style="color:var(--text-main); margin-bottom: 0.5rem; font-size:1.05rem;">Real-time Appointment Queue</h4>
+            <p style="color:var(--text-muted); font-size:0.85rem; line-height:1.5; margin:0;">
+              Patients can view slot availability in real time. Clinic staff manage active schedules via a color-coded administrative queue.
+            </p>
+          </div>
+          <div class="popup-feature-card" style="border: 1px solid var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 1.25rem; transition: var(--transition-smooth);">
+            <div style="font-size: 2rem; margin-bottom: 0.75rem;">🩺</div>
+            <h4 style="color:var(--text-main); margin-bottom: 0.5rem; font-size:1.05rem;">Smart Prescription Writer</h4>
+            <p style="color:var(--text-muted); font-size:0.85rem; line-height:1.5; margin:0;">
+              Doctors write digitised prescriptions in under 30 seconds using customizable templates, drug directories, and advice templates.
+            </p>
+          </div>
+          <div class="popup-feature-card" style="border: 1px solid var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 1.25rem; transition: var(--transition-smooth);">
+            <div style="font-size: 2rem; margin-bottom: 0.75rem;">💳</div>
+            <h4 style="color:var(--text-main); margin-bottom: 0.5rem; font-size:1.05rem;">Cashless UPI Payments</h4>
+            <p style="color:var(--text-muted); font-size:0.85rem; line-height:1.5; margin:0;">
+              Generate patient invoices and dynamic BHIM/UPI payment QR codes instantly. Track outstanding dues and financial analytics.
+            </p>
+          </div>
+          <div class="popup-feature-card" style="border: 1px solid var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 1.25rem; transition: var(--transition-smooth);">
+            <div style="font-size: 2rem; margin-bottom: 0.75rem;">💬</div>
+            <h4 style="color:var(--text-main); margin-bottom: 0.5rem; font-size:1.05rem;">WhatsApp Integration</h4>
+            <p style="color:var(--text-muted); font-size:0.85rem; line-height:1.5; margin:0;">
+              Confirmed bookings and digital prescription summaries are pushed automatically to patient phones via WhatsApp.
+            </p>
+          </div>
+        </div>
+
+        <!-- Interactive Micro-Demo Section -->
+        <div class="demo-box" style="border: 1px solid var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 2.5rem; box-shadow: var(--shadow-md);">
+          <div class="demo-tabs-nav" style="display:flex; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.15);">
+            <button type="button" class="demo-nav-btn active-tab" onclick="switchDemoSlide(0)" style="flex:1; padding:1rem; border:none; background:none; color:var(--text-main); font-weight:600; cursor:pointer; transition:var(--transition-smooth); outline:none;">📅 Live Queue Demo</button>
+            <button type="button" class="demo-nav-btn" onclick="switchDemoSlide(1)" style="flex:1; padding:1rem; border:none; background:none; color:var(--text-muted); font-weight:600; cursor:pointer; transition:var(--transition-smooth); outline:none;">🩺 Rx Writer Demo</button>
+            <button type="button" class="demo-nav-btn" onclick="switchDemoSlide(2)" style="flex:1; padding:1rem; border:none; background:none; color:var(--text-muted); font-weight:600; cursor:pointer; transition:var(--transition-smooth); outline:none;">💰 UPI Billing Demo</button>
+          </div>
+          <div class="demo-slides-container" style="padding:1.5rem;">
+            
+            <!-- Slide 0: Queue Demo -->
+            <div class="demo-slide" id="demo-slide-0" style="display:block;">
+              <h4 style="color:var(--text-main); margin-bottom:0.75rem;">Dynamic Appointment Scheduling Queue</h4>
+              <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem; line-height:1.5;">
+                Watch how clinic receptionists monitor active patients. Try updating a patient status to see estimated remaining wait times update!
+              </p>
+              <div class="table-wrapper" style="border:1px solid var(--border-color); border-radius:var(--radius-sm); overflow:hidden;">
+                <table class="custom-table" style="font-size:0.8rem; margin:0;">
+                  <thead>
+                    <tr>
+                      <th>Patient Name</th>
+                      <th>Scheduled Slot</th>
+                      <th>Token No.</th>
+                      <th>Status Badge</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Rohit Sharma</strong></td>
+                      <td>10:15 AM</td>
+                      <td>#04</td>
+                      <td><span class="user-badge" id="demo-q-badge-1" style="background:rgba(245,158,11,0.15); color:#f59e0b;">Waiting (25m)</span></td>
+                      <td>
+                        <select onchange="updateDemoQueueStatus(this, 'demo-q-badge-1')" class="form-control" style="font-size:0.75rem; padding:0.2rem 0.5rem; width:auto;">
+                          <option value="Waiting">Waiting</option>
+                          <option value="In Consultation">Consulting</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Priya Patel</strong></td>
+                      <td>10:30 AM</td>
+                      <td>#05</td>
+                      <td><span class="user-badge" id="demo-q-badge-2" style="background:rgba(56,189,248,0.15); color:#38bdf8;">In Consultation</span></td>
+                      <td>
+                        <select onchange="updateDemoQueueStatus(this, 'demo-q-badge-2')" class="form-control" style="font-size:0.75rem; padding:0.2rem 0.5rem; width:auto;">
+                          <option value="In Consultation">Consulting</option>
+                          <option value="Waiting">Waiting</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Slide 1: Rx Writer Demo -->
+            <div class="demo-slide" id="demo-slide-1" style="display:none;">
+              <h4 style="color:var(--text-main); margin-bottom:0.75rem;">Interactive Digital Prescription Editor</h4>
+              <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem; line-height:1.5;">
+                Click any common medication button below to see how doctors compose digital prescription pads instantly.
+              </p>
+              <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;" id="demo-rx-pills">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addDemoRx('Tab. Amoxicillin 500mg -- 1 tablet -- thrice daily -- duration 5 days')">💊 Amoxicillin 500mg</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addDemoRx('Tab. Paracetamol 650mg -- 1 tablet -- twice daily -- duration 3 days (SOS)')">💊 Paracetamol 650mg</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addDemoRx('Syr. Cetirizine 5ml -- 1 tsp -- once daily (night) -- duration 7 days')">🧪 Cetirizine Syrup</button>
+              </div>
+              <textarea id="demo-prescription-textarea" class="form-control" style="min-height:100px; font-family:monospace; font-size:0.85rem;" readonly placeholder="Your generated digital prescription pad will appear here..."></textarea>
+              <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" onclick="document.getElementById('demo-prescription-textarea').value=''">Clear Pad</button>
+            </div>
+
+            <!-- Slide 2: UPI Billing Demo -->
+            <div class="demo-slide" id="demo-slide-2" style="display:none;">
+              <h4 style="color:var(--text-main); margin-bottom:0.75rem;">Dynamic Cashless UPI Billing Generator</h4>
+              <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem; line-height:1.5;">
+                Enter a consultation fee below to generate a dynamic UPI QR Code simulator for instant, cashless payments.
+              </p>
+              <div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap;">
+                <div class="form-group" style="margin:0; width:150px;">
+                  <label style="font-size:0.75rem; color:var(--text-muted);">Consultation Fee (₹)</label>
+                  <input type="number" id="demo-billing-amount" class="form-control" value="500" min="10" oninput="generateDemoUpiQR()">
+                </div>
+                <div class="form-group" style="margin:0; width:220px;">
+                  <label style="font-size:0.75rem; color:var(--text-muted);">Clinic UPI Address</label>
+                  <input type="text" id="demo-billing-upi" class="form-control" value="mediflow@okhdfcbank" readonly>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:1.5rem; background:var(--bg-surface); padding:1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color); flex-wrap:wrap;">
+                <div style="background:#fff; padding:0.5rem; border-radius:var(--radius-sm); width:120px; height:120px; display:flex; align-items:center; justify-content:center;" id="demo-upi-qr-container">
+                  <canvas id="demo-upi-qr-canvas" style="width:105px; height:105px;"></canvas>
+                </div>
+                <div>
+                  <div style="font-size:0.95rem; font-weight:600; color:var(--text-main);">MediFlow Scan & Pay QR</div>
+                  <div style="font-size:0.8rem; color:var(--success); margin-top:0.25rem; font-weight:600;" id="demo-billing-text">Amount: ₹500.00</div>
+                  <p style="font-size:0.75rem; color:var(--text-muted); margin:0.25rem 0 0; line-height:1.4;">
+                    Patients scan this in their phone's GPay, PhonePe or Paytm. Payment completes directly to your bank account with no middleman.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Contact Form Section -->
+        <div style="border-top: 1px solid var(--border-color); padding-top: 2rem;">
+          <h3 style="font-family:var(--font-heading); color:var(--text-main); margin-bottom: 0.5rem;">🏥 Request a Free Demo / Contact Super Admin</h3>
+          <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem; line-height:1.5;">
+            Are you a clinic administrator or doctor interested in deploying MediFlow at your facility? Fill out the details below. Our platform administrator will register your sandbox and get back to you shortly.
+          </p>
+          <form id="inquiry-form" onsubmit="handleInquirySubmit(event)">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+              <div class="form-group" style="margin:0;">
+                <label for="inq-clinic-name">Clinic Name</label>
+                <input type="text" id="inq-clinic-name" class="form-control" required placeholder="e.g. Care Speciality Clinic">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="inq-contact-name">Contact Person Name</label>
+                <input type="text" id="inq-contact-name" class="form-control" required placeholder="e.g. Dr. Amit Sharma">
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+              <div class="form-group" style="margin:0;">
+                <label for="inq-email">Email Address</label>
+                <input type="email" id="inq-email" class="form-control" required placeholder="e.g. contact@clinic.com">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="inq-phone">Phone Number</label>
+                <input type="tel" id="inq-phone" class="form-control" required placeholder="e.g. +91 98765 43210">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="inq-city">City</label>
+                <input type="text" id="inq-city" class="form-control" required placeholder="e.g. Mumbai">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="inq-message">How can we help you? (Inquiry Message)</label>
+              <textarea id="inq-message" class="form-control" style="min-height:80px;" required placeholder="Describe your clinic size, medical specialities, and any features you'd like to test..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="font-weight:600; padding:0.6rem 2rem;">📩 Submit Inquiry Request</button>
+          </form>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border-color); display:flex; justify-content:flex-end; padding:1rem 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-learn-more')">Close Guide</button>
+      </div>
     </div>
   </div>
 

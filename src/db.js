@@ -592,6 +592,30 @@ class DB {
         return { success: true };
       }
 
+      // --- Inquiries (Prospective Clinic Inquiries) ---
+      case 'getInquiries':
+        return getList('mediflow_inquiries');
+
+      case 'saveInquiry': {
+        const inquiries = getList('mediflow_inquiries');
+        if (!payload.id) {
+          payload.id = 'inq-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        }
+        if (!payload.timestamp) {
+          payload.timestamp = new Date().toISOString();
+        }
+        inquiries.push(payload);
+        saveList('mediflow_inquiries', inquiries);
+        return payload;
+      }
+
+      case 'deleteInquiry': {
+        const inquiries = getList('mediflow_inquiries');
+        const filtered = inquiries.filter(i => i.id !== payload.id);
+        saveList('mediflow_inquiries', filtered);
+        return { success: true };
+      }
+
       default:
         throw new Error(`Unknown Local Database operation: ${action}`);
     }

@@ -3003,3 +3003,72 @@ body.light-theme .btn-tutorial:hover {
   line-height: 1.45;
   margin: 0;
 }
+
+/* =============================================================
+   CLINIC PARTNER & FEATURE SHOWCASE POPUP STYLING
+   ============================================================= */
+.features-popup-grid {
+  margin-top: 1.5rem;
+}
+.popup-feature-card {
+  transition: var(--transition-smooth);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+.popup-feature-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 10px 24px rgba(56, 189, 248, 0.12);
+  background: var(--bg-surface-hover) !important;
+}
+.demo-box {
+  background: var(--bg-surface-elevated);
+}
+.demo-nav-btn {
+  border-bottom: 2px solid transparent !important;
+  font-family: var(--font-heading);
+}
+.demo-nav-btn:hover {
+  color: var(--accent-color) !important;
+  background: rgba(255,255,255,0.02) !important;
+}
+.demo-nav-btn.active-tab {
+  color: var(--accent-color) !important;
+  border-bottom: 2px solid var(--accent-color) !important;
+  background: rgba(56, 189, 248, 0.05) !important;
+}
+.demo-slide {
+  animation: fadeInSlide 0.35s ease-out;
+}
+#demo-rx-pills .btn-secondary {
+  border-color: rgba(255,255,255,0.08);
+  font-weight: 500;
+  transition: var(--transition-smooth);
+}
+#demo-rx-pills .btn-secondary:hover {
+  border-color: var(--accent-color);
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--accent-color);
+}
+#demo-prescription-textarea {
+  background: var(--bg-app);
+  color: var(--success);
+  border-color: var(--border-color);
+}
+#demo-prescription-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

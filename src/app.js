@@ -538,6 +538,9 @@ async function loadSuperAdminDashboard() {
 
   // Populate Clinic Payments table
   renderClinicPayments();
+
+  // Populate Prospective inquiries
+  renderSuperAdminInquiries();
 }
 
 window.editClinic = async function(id) {
@@ -1183,15 +1186,29 @@ function renderDoctorDrugs() {
         <span class="pill-delete" onclick="event.stopPropagation(); deleteDoctorItem('drug', '${d.id}')">&times;</span>
       </span>
     `;
-    pill.addEventListener('click', () => appendDrugToPrescription(d.name));
+    pill.addEventListener('click', () => appendDrugToPrescription(d));
     listContainer.appendChild(pill);
   });
 }
 
-function appendDrugToPrescription(drugName) {
+function appendDrugToPrescription(d) {
   const rxArea = document.getElementById('canvas-prescription');
   const separator = rxArea.value.trim() === '' ? '' : '\n';
-  rxArea.value = rxArea.value + separator + `Tab. ${drugName} -- 1 tablet -- duration SOS`;
+  
+  let name, prefix, dose, freq;
+  if (typeof d === 'string') {
+    name = d;
+    prefix = 'Tab.';
+    dose = '1 tablet';
+    freq = 'twice daily -- duration SOS';
+  } else {
+    name = d.name;
+    prefix = d.prefix || 'Tab.';
+    dose = d.dose || '1 tablet';
+    freq = d.freq || 'twice daily -- duration SOS';
+  }
+  
+  rxArea.value = rxArea.value + separator + `${prefix} ${name} -- ${dose} -- ${freq}`;
   syncCanvasToPrintPreview();
 }
 
@@ -1340,6 +1357,11 @@ function openDoctorItemModal(type) {
   document.getElementById('doc-item-type').value = type;
   document.getElementById('doc-item-id').value = '';
   document.getElementById('doc-item-form').reset();
+  if (type === 'drug') {
+    document.getElementById('doc-item-drug-prefix').value = 'Tab.';
+    document.getElementById('doc-item-drug-dose').value = '1 tablet';
+    document.getElementById('doc-item-drug-freq').value = 'twice daily -- duration SOS';
+  }
   
   // Hide all sections first
   document.getElementById('doc-item-template-fields').classList.add('hidden');
@@ -1393,6 +1415,9 @@ window.editDoctorItem = function(type, id) {
     if (d) {
       document.getElementById('doc-item-name').value = d.name;
       document.getElementById('doc-item-drug-category').value = d.category || '';
+      document.getElementById('doc-item-drug-prefix').value = d.prefix || 'Tab.';
+      document.getElementById('doc-item-drug-dose').value = d.dose || '1 tablet';
+      document.getElementById('doc-item-drug-freq').value = d.freq || 'twice daily -- duration SOS';
     }
   } else if (type === 'test') {
     document.getElementById('doc-item-title').textContent = 'Edit Diagnostic Lab Order';
@@ -1543,7 +1568,10 @@ async function handleDoctorItemSubmit(e) {
     await DB.request('saveDrug', {
       ...reqArgs,
       name,
-      category: document.getElementById('doc-item-drug-category').value
+      category: document.getElementById('doc-item-drug-category').value,
+      prefix: document.getElementById('doc-item-drug-prefix').value,
+      dose: document.getElementById('doc-item-drug-dose').value.trim(),
+      freq: document.getElementById('doc-item-drug-freq').value.trim()
     });
   } else if (type === 'test') {
     await DB.request('saveTest', {
@@ -1653,6 +1681,8 @@ window.switchSuperAdminTab = function(tabName) {
   document.getElementById('panel-admin-clinics').classList.add('hidden');
   document.getElementById('panel-admin-admins').classList.add('hidden');
   document.getElementById('panel-admin-payments').classList.add('hidden');
+  const panelInq = document.getElementById('panel-admin-inquiries');
+  if (panelInq) panelInq.classList.add('hidden');
 
   if (tabName === 'clinics') {
     document.getElementById('btn-admin-tab-clinics').classList.add('active');
@@ -1664,6 +1694,13 @@ window.switchSuperAdminTab = function(tabName) {
     document.getElementById('btn-admin-tab-payments').classList.add('active');
     document.getElementById('panel-admin-payments').classList.remove('hidden');
     renderClinicPayments();
+  } else if (tabName === 'inquiries') {
+    const btnInq = document.getElementById('btn-admin-tab-inquiries');
+    if (btnInq) btnInq.classList.add('active');
+    if (panelInq) {
+      panelInq.classList.remove('hidden');
+      renderSuperAdminInquiries();
+    }
   }
 };
 
@@ -5467,15 +5504,160 @@ async function handleProfileSettingsSubmit(e) {
   }
 }
 
+// =============================================================
+// CLINIC PARTNER SHOWCASE MODAL & DEMO HANDLERS
+// =============================================================
+window.switchDemoSlide = function(slideIndex) {
+  // Hide all slides
+  document.getElementById('demo-slide-0').style.display = 'none';
+  document.getElementById('demo-slide-1').style.display = 'none';
+  document.getElementById('demo-slide-2').style.display = 'none';
+  
+  // Remove active-tab class from all buttons
+  const buttons = document.querySelectorAll('.demo-nav-btn');
+  buttons.forEach(btn => btn.classList.remove('active-tab'));
+  buttons.forEach(btn => btn.style.color = 'var(--text-muted)');
+  
+  // Show target slide and set button active
+  document.getElementById(`demo-slide-${slideIndex}`).style.display = 'block';
+  if (buttons[slideIndex]) {
+    buttons[slideIndex].classList.add('active-tab');
+    buttons[slideIndex].style.color = 'var(--text-main)';
+  }
+  
+  // If UPI QR slide, generate QR
+  if (slideIndex === 2) {
+    generateDemoUpiQR();
+  }
+};
+
+window.updateDemoQueueStatus = function(select, badgeId) {
+  const badge = document.getElementById(badgeId);
+  if (!badge) return;
+  const status = select.value;
+  badge.textContent = status;
+  
+  if (status === 'Waiting') {
+    badge.textContent = 'Waiting (25m)';
+    badge.style.background = 'rgba(245,158,11,0.15)';
+    badge.style.color = '#f59e0b';
+  } else if (status === 'In Consultation') {
+    badge.style.background = 'rgba(56,189,248,0.15)';
+    badge.style.color = '#38bdf8';
+  } else if (status === 'Completed') {
+    badge.style.background = 'rgba(16,185,129,0.15)';
+    badge.style.color = '#10b981';
+  }
+};
+
+window.addDemoRx = function(medicationText) {
+  const pad = document.getElementById('demo-prescription-textarea');
+  if (!pad) return;
+  const separator = pad.value.trim() === '' ? '' : '\n';
+  pad.value = pad.value + separator + medicationText;
+};
+
+window.generateDemoUpiQR = async function() {
+  const amountInput = document.getElementById('demo-billing-amount');
+  const amount = parseFloat(amountInput.value || '0').toFixed(2);
+  const upiId = 'mediflow@okhdfcbank';
+  const displayVal = document.getElementById('demo-billing-text');
+  if (displayVal) displayVal.textContent = `Amount: ₹${amount}`;
+
+  const canvas = document.getElementById('demo-upi-qr-canvas');
+  if (canvas && typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+    const upiUri = `upi://pay?pa=${upiId}&pn=MediFlowDemo&am=${amount}&cu=INR&tn=DEMO_${Date.now()}`;
+    try {
+      await QRCode.toCanvas(canvas, upiUri, { 
+        width: 105, 
+        margin: 1, 
+        color: { dark: '#000000', light: '#ffffff' } 
+      });
+    } catch(e) {
+      console.warn('Demo QR generation error:', e);
+    }
+  }
+};
+
+window.handleInquirySubmit = async function(e) {
+  e.preventDefault();
+  const clinicName = document.getElementById('inq-clinic-name').value.trim();
+  const contactName = document.getElementById('inq-contact-name').value.trim();
+  const email = document.getElementById('inq-email').value.trim();
+  const phone = document.getElementById('inq-phone').value.trim();
+  const city = document.getElementById('inq-city').value.trim();
+  const message = document.getElementById('inq-message').value.trim();
+  
+  if (!clinicName || !contactName || !email || !phone || !city || !message) {
+    alert("Please fill in all inquiry fields.");
+    return;
+  }
+  
+  const payload = {
+    clinicName,
+    contactName,
+    email,
+    phone,
+    city,
+    message,
+    timestamp: new Date().toISOString()
+  };
+  
+  await DB.request('saveInquiry', payload);
+  
+  // Reset form and close modal
+  document.getElementById('inquiry-form').reset();
+  closeModal('modal-learn-more');
+  
+  // Show custom toast if logged in or fallback alert
+  if (typeof showPortalToast === 'function') {
+    showPortalToast("Thank you! Your demo request has been sent to the Super Admin.", "success");
+  } else {
+    alert("Thank you! Your demo request has been submitted to the Super Admin. We will get in touch with you shortly.");
+  }
+};
+
+// --- Inquiries Panel rendering in Super Admin ---
+window.renderSuperAdminInquiries = async function() {
+  const inquiries = await DB.request('getInquiries') || [];
+  const tbody = document.querySelector('#inquiries-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  
+  if (inquiries.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No prospective clinic inquiries received yet.</td></tr>`;
+    return;
+  }
+  
+  inquiries.forEach(inq => {
+    const tr = document.createElement('tr');
+    const dateStr = inq.timestamp ? new Date(inq.timestamp).toLocaleString() : '—';
+    tr.innerHTML = `
+      <td>${dateStr}</td>
+      <td><strong>${escapeHTML(inq.clinicName || '')}</strong></td>
+      <td>${escapeHTML(inq.contactName || '')}</td>
+      <td>
+        <div style="font-size:0.8rem; color:var(--text-main);">📧 ${escapeHTML(inq.email || '')}</div>
+        <div style="font-size:0.8rem; color:var(--text-main); margin-top:0.25rem;">📞 ${escapeHTML(inq.phone || '')}</div>
+      </td>
+      <td>${escapeHTML(inq.city || '')}</td>
+      <td style="max-width: 250px; white-space: normal; word-wrap: break-word; font-size:0.8rem;">${escapeHTML(inq.message || '')}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm btn-danger" onclick="deleteInquiry('${inq.id}')">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+};
+
+window.deleteInquiry = async function(id) {
+  if (confirm('Are you sure you want to permanently delete this inquiry from the registry?')) {
+    await DB.request('deleteInquiry', { id });
+    renderSuperAdminInquiries();
+  }
+};
+
 // Expose new window methods
 window.openProfileSettingsModal = openProfileSettingsModal;
 window.handleProfileSettingsSubmit = handleProfileSettingsSubmit;
-window.openAddSpecialityModal = openAddSpecialityModal;
-window.openEditSpecialityModal = openEditSpecialityModal;
-window.handleSpecialitySubmit = handleSpecialitySubmit;
-window.deleteCadminSpeciality = deleteCadminSpeciality;
-window.openCategoriesModal = openCategoriesModal;
-window.handleCategoryAdd = handleCategoryAdd;
-window.editDrugCategory = editDrugCategory;
-window.deleteDrugCategory = deleteDrugCategory;
 
