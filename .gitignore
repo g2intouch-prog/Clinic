@@ -10,3 +10,6 @@ Thumbs.db
 
 # Log files
 *.log
+
+.vercel
+.env*

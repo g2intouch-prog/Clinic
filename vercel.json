@@ -1,5 +1,6 @@
 {
   "outputDirectory": ".",
+  "devCommand": "npx serve . --listen $PORT",
   "rewrites": [
     {
       "source": "/api/:path*",
