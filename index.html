@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MediFlow | Unified Clinic Management PWA</title>
+  <title>MediFlow | Book Doctor Appointments Online</title>
   <!-- SEO Meta Tags -->
-  <meta name="description" content="Secure multi-tenant clinical workflow suite featuring digital prescription pads, intake records, diagnostics, and precise print routing.">
-  <meta name="keywords" content="clinic management, pwa, doctor prescription, vitals tracking, healthcare software">
+  <meta name="description" content="Book doctor appointments online. Choose your city, clinic, speciality and doctor. Get confirmed appointments and digital prescriptions via WhatsApp.">
+  <meta name="keywords" content="book doctor appointment, online clinic booking, doctor near me, digital prescription, UPI payment clinic">
   <!-- PWA Manifest & Theme -->
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#6366f1">
   <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg">
-  
+  <!-- QR Code Library (for UPI payment QR generation) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <!-- Modern UI CSS -->
   <link rel="stylesheet" href="./src/styles.css">
 </head>
@@ -54,6 +55,7 @@
         <strong id="nav-user-name">Dr. Rajesh Iyer</strong>
       </div>
       
+      <button class="btn btn-secondary btn-sm" onclick="openProfileSettingsModal()" style="margin-right:0.25rem;">⚙️ Settings</button>
       <button class="btn btn-secondary btn-sm btn-danger" id="logout-btn">Log Out</button>
     </div>
   </nav>
@@ -61,7 +63,7 @@
   <!-- ============================================
        1. AUTHENTICATION / LOGIN PAGE VIEW
        ============================================ -->
-  <main class="login-container" id="view-login">
+  <main class="login-container hidden" id="view-login">
     <div class="login-card fade-in">
       <div class="login-header">
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:5rem; height:5rem; margin: 0 auto 1rem;">
@@ -87,6 +89,10 @@
           <label for="login-password">Password</label>
           <input type="password" id="login-password" class="form-control" required placeholder="••••••••" autocomplete="current-password">
         </div>
+        <label class="form-disclaimer">
+          <input type="checkbox" id="login-disclaimer" required>
+          <span>I acknowledge that this is a simulated demo environment. I will not input real medical, financial, or sensitive personal data.</span>
+        </label>
         <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.5rem;">Authenticate Access</button>
       </form>
 
@@ -94,7 +100,7 @@
       <div class="quick-roles">
         <p>Testing Sandboxes (Click to pre-fill credentials)</p>
         <div class="role-buttons">
-          <button class="btn btn-secondary btn-sm" onclick="prefillLogin('admin', 'password')">🔑 Super Admin</button>
+          <button class="btn btn-secondary btn-sm hidden" id="quick-role-admin" onclick="prefillLogin('admin', 'password')">🔑 Super Admin</button>
           <button class="btn btn-secondary btn-sm" onclick="prefillLogin('cadmin1', 'password')">🏥 Clinic Admin</button>
           <button class="btn btn-secondary btn-sm" onclick="prefillLogin('staff1', 'password')">📋 Clinic Staff</button>
           <button class="btn btn-secondary btn-sm" onclick="prefillLogin('doctor1', 'password')">🩺 Doctor</button>
@@ -149,6 +155,7 @@
             <tr>
               <th>Clinic ID</th>
               <th>Clinic Name</th>
+              <th>City</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -214,6 +221,7 @@
         <p class="text-muted" id="clinic-admin-subtitle">Clinic Scoped Operations</p>
       </div>
       <div style="display:flex; gap:0.5rem;">
+        <button class="btn btn-tutorial" onclick="openTutorialModal('clinic_admin')" style="font-weight:600;">❓ Help & Tutorial</button>
         <button class="btn btn-secondary" onclick="openViewScheduleModal()" style="background-color: var(--accent-color); color: #000; font-weight:600;">📅 Manage Schedule</button>
         <button class="btn btn-secondary" onclick="triggerChatAuditAuth()" style="background-color: var(--staff-color); color: #fff; font-weight:600;">📂 Chat Archive</button>
         <button class="btn btn-primary" id="cadmin-add-user-btn">+ Add Clinic User Profile</button>
@@ -228,6 +236,7 @@
       <button class="btn btn-secondary" id="btn-cadmin-tab-finance" onclick="switchCadminTab('finance')">💰 Financial Reports</button>
       <button class="btn btn-secondary" id="btn-cadmin-tab-attendance" onclick="switchCadminTab('attendance')">🕒 Attendance Logs</button>
       <button class="btn btn-secondary" id="btn-cadmin-tab-performance" onclick="switchCadminTab('performance')">📈 Performance Reports</button>
+      <button class="btn btn-secondary" id="btn-cadmin-tab-specialities" onclick="switchCadminTab('specialities')">🏥 Specialities</button>
     </div>
 
     <!-- Panel 1: Users & Settings -->
@@ -465,6 +474,26 @@
           <tbody>
             <!-- Dynamic Injection -->
           </tbody>
+    </div>
+    
+    <!-- Panel 7: Specialities Management -->
+    <div id="panel-cadmin-specialities" class="glass-panel hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3>Manage Facility Specialities</h3>
+        <button class="btn btn-primary" onclick="openAddSpecialityModal()">+ Add Speciality</button>
+      </div>
+      <div class="table-wrapper">
+        <table class="custom-table" id="cadmin-specialities-table">
+          <thead>
+            <tr>
+              <th>Speciality Name</th>
+              <th>Icon Representation</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic Injection -->
+          </tbody>
         </table>
       </div>
     </div>
@@ -484,7 +513,10 @@
     <div id="panel-staff-reception">
       <div class="section-header">
         <h2>Reception Desk & Vitals Intake</h2>
-        <button class="btn btn-primary" id="staff-add-patient-btn">+ Register New Patient</button>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-tutorial" onclick="openTutorialModal('staff')">❓ Help & Tutorial</button>
+          <button class="btn btn-primary" id="staff-add-patient-btn">+ Register New Patient</button>
+        </div>
       </div>
 
       <div class="glass-panel" style="margin-bottom:2rem;">
@@ -648,6 +680,7 @@
                   <span class="slider"></span>
                 </label>
               </div>
+              <button class="btn btn-tutorial btn-sm" onclick="openTutorialModal('doctor')">❓ Help & Tutorial</button>
               <button class="btn btn-primary btn-sm" id="doctor-print-btn" style="background-color: var(--success); color: #000;">Print Prescription</button>
             </div>
           </div>
@@ -717,15 +750,13 @@
         <div class="tool-group">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
             <h4 style="font-size: 0.95rem;">Drug Directory</h4>
-            <button class="btn btn-secondary btn-sm" id="add-drug-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">+ Add</button>
+            <div style="display: flex; gap: 0.25rem;">
+              <button class="btn btn-secondary btn-sm" id="add-drug-btn" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">+ Add Drug</button>
+              <button class="btn btn-secondary btn-sm" onclick="openCategoriesModal()" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">📁 Categories</button>
+            </div>
           </div>
           <select id="drug-category-selector" class="picker-select">
             <option value="All">All Categories</option>
-            <option value="Antibiotics">Antibiotics</option>
-            <option value="NSAIDs/Analgesics">NSAIDs/Analgesics</option>
-            <option value="Antihistamines">Antihistamines</option>
-            <option value="Derma">Dermatology (External)</option>
-            <option value="General">General / Vitamin Supplements</option>
           </select>
           <div class="grid-pills" id="toolbox-drugs-list">
             <!-- Dynamic drugs -->
@@ -911,6 +942,26 @@
             <input type="text" id="clinic-form-name" class="form-control" required placeholder="e.g. Apex MultiSpecialty Center">
           </div>
           <div class="form-group">
+            <label for="clinic-form-city">City Name</label>
+            <input type="text" id="clinic-form-city" class="form-control" required placeholder="e.g. Mumbai">
+          </div>
+          <div class="form-group">
+            <label for="clinic-form-address">Address</label>
+            <input type="text" id="clinic-form-address" class="form-control" required placeholder="e.g. 101, Park Avenue">
+          </div>
+          <div class="form-group">
+            <label for="clinic-form-phone">Phone Number</label>
+            <input type="text" id="clinic-form-phone" class="form-control" required placeholder="e.g. +91-22-4567-8900">
+          </div>
+          <div class="form-group">
+            <label for="clinic-form-upi">UPI ID (for payments)</label>
+            <input type="text" id="clinic-form-upi" class="form-control" required placeholder="e.g. clinic@upi">
+          </div>
+          <div class="form-group">
+            <label for="clinic-form-fee">Consultation Fee (₹)</label>
+            <input type="number" id="clinic-form-fee" class="form-control" required min="0" placeholder="e.g. 500">
+          </div>
+          <div class="form-group">
             <label for="clinic-form-subscription">Subscription Status</label>
             <select id="clinic-form-subscription" class="form-control">
               <option value="Active">Active Subscription</option>
@@ -979,6 +1030,25 @@
             <div class="form-group">
               <label for="user-form-desig">Designation</label>
               <input type="text" id="user-form-desig" class="form-control" placeholder="e.g. Senior Pediatrician">
+            </div>
+            <div class="form-group">
+              <label for="user-form-speciality">Speciality</label>
+              <select id="user-form-speciality" class="form-control">
+                <option value="">— Select Speciality —</option>
+                <option value="General Medicine">General Medicine</option>
+                <option value="ENT">ENT</option>
+                <option value="Dental">Dental</option>
+                <option value="Dermatology">Dermatology</option>
+                <option value="Ophthalmology">Ophthalmology</option>
+                <option value="Orthopaedics">Orthopaedics</option>
+                <option value="Gynaecology">Gynaecology</option>
+                <option value="Paediatrics">Paediatrics</option>
+                <option value="Cardiology">Cardiology</option>
+                <option value="Neurology">Neurology</option>
+                <option value="Psychiatry">Psychiatry</option>
+                <option value="Urology">Urology</option>
+                <option value="Oncology">Oncology</option>
+              </select>
             </div>
           </div>
         </div>
@@ -1136,15 +1206,36 @@
 
           <!-- Drug Specific Fields -->
           <div id="doc-item-drug-fields" class="hidden">
-            <div class="form-group">
-              <label for="doc-item-drug-category">Drug Category</label>
-              <select id="doc-item-drug-category" class="form-control">
-                <option value="Antibiotics">Antibiotics</option>
-                <option value="NSAIDs/Analgesics">NSAIDs/Analgesics</option>
-                <option value="Antihistamines">Antihistamines</option>
-                <option value="Derma">Dermatology (External)</option>
-                <option value="General">General / Vitamin Supplements</option>
-              </select>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="doc-item-drug-prefix">Drug Prefix</label>
+                <select id="doc-item-drug-prefix" class="form-control">
+                  <option value="Tab.">Tab.</option>
+                  <option value="Syp.">Syp.</option>
+                  <option value="Inj.">Inj.</option>
+                  <option value="Ung.">Ung.</option>
+                  <option value="Cap.">Cap.</option>
+                  <option value="Oint.">Oint.</option>
+                  <option value="Drops">Drops</option>
+                  <option value="None">None (No Prefix)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="doc-item-drug-category">Drug Category</label>
+                <select id="doc-item-drug-category" class="form-control">
+                  <!-- Will be populated dynamically -->
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="doc-item-drug-dose">Default Dose</label>
+                <input type="text" id="doc-item-drug-dose" class="form-control" placeholder="e.g. 1 tablet, 5ml" value="1 tablet">
+              </div>
+              <div class="form-group">
+                <label for="doc-item-drug-freq">Default Frequency / Duration</label>
+                <input type="text" id="doc-item-drug-freq" class="form-control" placeholder="e.g. twice daily -- duration 5 days" value="twice daily -- duration SOS">
+              </div>
             </div>
           </div>
 
@@ -1203,6 +1294,33 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-clinic-admin')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Admin Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manage Speciality Modal -->
+  <div class="modal-backdrop hidden" id="modal-speciality">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3 id="speciality-modal-title">Add New Speciality</h3>
+        <button class="modal-close" onclick="closeModal('modal-speciality')">&times;</button>
+      </div>
+      <form id="speciality-form" onsubmit="handleSpecialitySubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="speciality-form-old-name">
+          <div class="form-group">
+            <label for="speciality-form-name">Speciality Name</label>
+            <input type="text" id="speciality-form-name" class="form-control" required placeholder="e.g. Nephrology">
+          </div>
+          <div class="form-group">
+            <label for="speciality-form-icon">Icon (Emoji or single character)</label>
+            <input type="text" id="speciality-form-icon" class="form-control" required placeholder="e.g. 🩺, 🦷, 👁️">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-speciality')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Speciality</button>
         </div>
       </form>
     </div>
@@ -1571,6 +1689,31 @@
     </div>
   </div>
 
+  <!-- modal-login-clinic-select: Choose clinic for Clinic Admin Login -->
+  <div class="modal-backdrop hidden" id="modal-login-clinic-select" style="z-index: 2000;">
+    <div class="modal-content" style="max-width: 420px;">
+      <div class="modal-header" style="background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color);">
+        <h3 style="display:flex; align-items:center; gap:0.5rem; font-family:var(--font-heading); font-weight:700;">🏥 Select Clinic</h3>
+        <button class="modal-close" onclick="closeModal('modal-login-clinic-select')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;">
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height:1.5;">
+          You are logging in as a Clinic Administrator. Please choose the clinic workspace you wish to manage.
+        </p>
+        <div class="form-group">
+          <label for="login-clinic-dropdown" style="font-weight:600; margin-bottom:0.5rem; display:block;">Active Clinic Workspace</label>
+          <select id="login-clinic-dropdown" class="form-control" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border-color); background:var(--bg-surface-elevated); color:var(--text-main); font-size:0.95rem;">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border-color); display:flex; justify-content:flex-end; gap:0.75rem; padding:1rem 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-login-clinic-select')">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="confirmClinicAdminLogin()" style="background-color: var(--success); color:#000; font-weight:700;">Login & Manage →</button>
+      </div>
+    </div>
+  </div>
+
   <!-- modal-cadmin-auth: Security verification for Chat Archive access -->
   <div class="modal-backdrop hidden" id="modal-cadmin-auth" style="z-index: 1200;">
     <div class="modal-content" style="max-width: 400px;">
@@ -1733,5 +1876,756 @@
       });
     }
   </script>
+
+  <!-- ============================================================
+       PATIENT PORTAL — SHARED NAV BAR (shown on patient views)
+       ============================================================ -->
+  <nav class="patient-nav hidden" id="patient-nav">
+    <a href="#" class="brand" onclick="portalGoLanding(); return false;">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" rx="20" fill="url(#pnav-grad)"/>
+        <path d="M30 50H70M50 30V70" stroke="white" stroke-width="12" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="pnav-grad" x1="0" y1="0" x2="100" y2="100">
+            <stop stop-color="#6366f1"/>
+            <stop offset="1" stop-color="#0ea5e9"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span>MediFlow</span>
+    </a>
+    <div class="patient-nav-actions" id="patient-nav-actions">
+      <span class="patient-greeting hidden" id="patient-nav-greeting">Welcome, <strong id="patient-nav-name"></strong></span>
+      <button class="btn btn-secondary btn-sm hidden" id="patient-dashboard-btn" onclick="portalShowDashboard()">📋 My Records</button>
+      <button class="btn btn-secondary btn-sm hidden" id="patient-book-btn" onclick="portalStartBooking()">+ Book Appointment</button>
+      <button class="btn btn-secondary btn-sm hidden" id="patient-settings-btn" onclick="openProfileSettingsModal()" style="margin-right:0.25rem;">⚙️ Settings</button>
+      <button class="btn btn-secondary btn-sm hidden" id="patient-logout-btn" onclick="portalLogout()">Log Out</button>
+      <button class="btn btn-secondary btn-sm" id="patient-signin-nav-btn" onclick="portalShowAuth('signin')">Sign In</button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       PATIENT PORTAL — LANDING PAGE (default view)
+       ============================================================ -->
+  <main id="view-landing">
+    <!-- Development Caution Banner -->
+    <div class="dev-caution-banner">
+      <span class="warning-icon">⚠️</span>
+      <div class="dev-caution-content">
+        <strong>Under Development:</strong> This project is currently in the active development phase and is not production-ready. All data, appointments, and receipts simulated here are for demonstration purposes only. Please do not enter real medical or confidential personal information.
+      </div>
+    </div>
+
+    <!-- HERO SECTION -->
+    <section class="landing-hero">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="dot-pulse"></span>
+          Trusted by patients across India
+        </div>
+        <h1>Your Health,<br><span class="grad-text">Booked Instantly</span></h1>
+        <p>Find the right doctor, pick your time slot, and get a confirmed appointment with your digital ticket — all in minutes.</p>
+        <div class="hero-cta-group">
+          <button class="btn-hero-primary" id="landing-book-btn" onclick="portalShowAuth('signup')">
+            🏥 Book an Appointment
+          </button>
+          <button class="btn-hero-secondary" id="landing-clinic-login-btn" onclick="showClinicLogin()">
+            🔐 Clinic Login
+          </button>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat-item">
+            <div class="num" id="stat-clinics-hero">2+</div>
+            <div class="lbl">Registered Clinics</div>
+          </div>
+          <div class="hero-stat-item">
+            <div class="num" id="stat-doctors-hero">3+</div>
+            <div class="lbl">Expert Doctors</div>
+          </div>
+          <div class="hero-stat-item">
+            <div class="num">500+</div>
+            <div class="lbl">Happy Patients</div>
+          </div>
+          <div class="hero-stat-item">
+            <div class="num">4.8★</div>
+            <div class="lbl">Average Rating</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES SECTION -->
+    <section class="landing-section">
+      <div class="section-label">Why MediFlow?</div>
+      <h2 class="section-heading">Everything you need, simply done</h2>
+      <p class="section-sub">From booking to payment to your digital prescription — we handle the entire patient journey.</p>
+      <div class="features-grid">
+        <div class="feature-card" style="--fc-color: #6366f1;">
+          <div class="feature-icon" style="background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.25);">📅</div>
+          <h3>Instant Online Booking</h3>
+          <p>Choose your speciality, doctor, date, and time in under 2 minutes. No phone calls needed.</p>
+        </div>
+        <div class="feature-card" style="--fc-color: #38bdf8;">
+          <div class="feature-icon" style="background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.25);">✅</div>
+          <h3>Confirmed Appointments</h3>
+          <p>Clinic staff review and confirm your booking. You get a digital appointment ticket instantly.</p>
+        </div>
+        <div class="feature-card" style="--fc-color: #25D366;">
+          <div class="feature-icon" style="background: rgba(37,211,102,0.12); border-color: rgba(37,211,102,0.25);">💬</div>
+          <h3>WhatsApp Ticket</h3>
+          <p>Get your appointment ticket and prescription summary sent directly via WhatsApp.</p>
+        </div>
+        <div class="feature-card" style="--fc-color: #10b981;">
+          <div class="feature-icon" style="background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.25);">💳</div>
+          <h3>Flexible Payments</h3>
+          <p>Pay at the clinic or instantly via UPI QR code. Track all your payment history in one place.</p>
+        </div>
+        <div class="feature-card" style="--fc-color: #f59e0b;">
+          <div class="feature-icon" style="background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.25);">📋</div>
+          <h3>Digital Prescriptions</h3>
+          <p>Access all your prescriptions digitally. View medicine details, diagnosis and doctor advice anytime.</p>
+        </div>
+        <div class="feature-card" style="--fc-color: #a855f7;">
+          <div class="feature-icon" style="background: rgba(168,85,247,0.12); border-color: rgba(168,85,247,0.25);">🏥</div>
+          <h3>Multi-Specialty Clinics</h3>
+          <p>Find doctors across General Medicine, ENT, Dental, Dermatology and more — all in one app.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS SECTION -->
+    <section class="landing-section" style="background: var(--bg-surface); border-radius: 24px; margin: 0 1rem 2rem; padding: 4rem 3rem;">
+      <div class="section-label">Simple Process</div>
+      <h2 class="section-heading">Book in 3 easy steps</h2>
+      <p class="section-sub">The entire booking process takes less than 3 minutes.</p>
+      <div class="steps-grid">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-icon">🔍</div>
+          <h3>Choose Your Doctor</h3>
+          <p>Select your city, clinic, speciality, and the doctor you'd like to see. View their availability in real time.</p>
+        </div>
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-icon">📅</div>
+          <h3>Pick a Time Slot</h3>
+          <p>Browse available slots colour-coded by availability. Green means free, red means booked.</p>
+        </div>
+        <div class="step-item">
+          <div class="step-number">3</div>
+          <div class="step-icon">🎫</div>
+          <h3>Get Your Ticket</h3>
+          <p>After clinic confirmation, choose your payment method and receive your appointment ticket via WhatsApp.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="landing-footer">
+      <p>© 2026 MediFlow. All rights reserved. &nbsp;|&nbsp; <a href="#" onclick="showClinicLogin(); return false;">Staff Login</a></p>
+    </footer>
+  </main>
+
+  <!-- ============================================================
+       PATIENT PORTAL — AUTH (SIGN UP / SIGN IN)
+       ============================================================ -->
+  <main class="patient-auth-container hidden" id="view-patient-auth">
+    <div class="patient-auth-card">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:3.5rem; height:3.5rem; margin: 0 auto 0.75rem; display:block;">
+          <circle cx="50" cy="50" r="45" fill="url(#auth-grad)"/>
+          <path d="M32 50H68M50 32V68" stroke="white" stroke-width="10" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="auth-grad" x1="0" y1="0" x2="100" y2="100">
+              <stop stop-color="#6366f1"/><stop offset="1" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <h2 style="font-size:1.5rem; margin-bottom:0.3rem;">Patient Portal</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">Sign up or sign in to book appointments</p>
+      </div>
+
+      <div class="auth-tab-bar">
+        <button class="auth-tab-btn active" id="auth-tab-signup" onclick="switchAuthTab('signup')">✨ Sign Up</button>
+        <button class="auth-tab-btn" id="auth-tab-signin" onclick="switchAuthTab('signin')">🔑 Sign In</button>
+      </div>
+
+      <!-- Sign Up Form -->
+      <div id="patient-signup-form">
+        <div class="form-group">
+          <label for="signup-name">Full Name</label>
+          <input type="text" id="signup-name" class="form-control" placeholder="e.g. Priya Sharma" required>
+        </div>
+        <div class="form-group">
+          <label for="signup-phone">Mobile Number</label>
+          <input type="tel" id="signup-phone" class="form-control" placeholder="10-digit mobile number" required>
+        </div>
+        <div class="form-group">
+          <label for="signup-password">Password</label>
+          <input type="password" id="signup-password" class="form-control" placeholder="Create a password" required>
+        </div>
+        <div class="form-group">
+          <label for="signup-confirm-password">Confirm Password</label>
+          <input type="password" id="signup-confirm-password" class="form-control" placeholder="Repeat your password" required>
+        </div>
+        <label class="form-disclaimer">
+          <input type="checkbox" id="signup-disclaimer" required>
+          <span>I acknowledge that this is a simulated demo environment. I will not input real medical, financial, or sensitive personal data.</span>
+        </label>
+        <button class="btn btn-hero-primary" style="width:100%;" id="signup-submit-btn" onclick="handlePatientSignup()">
+          Create Account
+        </button>
+        <p style="text-align:center; margin-top:1rem; font-size:0.85rem; color: var(--text-muted);">
+          Already have an account? <a href="#" onclick="switchAuthTab('signin'); return false;" style="color:#6366f1;">Sign In</a>
+        </p>
+      </div>
+
+      <!-- Sign In Form -->
+      <div id="patient-signin-form" class="hidden">
+        <div class="form-group">
+          <label for="signin-phone">Mobile Number</label>
+          <input type="tel" id="signin-phone" class="form-control" placeholder="Your registered mobile" required>
+        </div>
+        <div class="form-group">
+          <label for="signin-password">Password</label>
+          <input type="password" id="signin-password" class="form-control" placeholder="Your password" required>
+        </div>
+        <label class="form-disclaimer">
+          <input type="checkbox" id="signin-disclaimer" required>
+          <span>I acknowledge that this is a simulated demo environment. I will not input real medical, financial, or sensitive personal data.</span>
+        </label>
+        <button class="btn btn-hero-primary" style="width:100%;" id="signin-submit-btn" onclick="handlePatientSignin()">
+          Sign In
+        </button>
+        <p style="text-align:center; margin-top:1rem; font-size:0.85rem; color: var(--text-muted);">
+          New patient? <a href="#" onclick="switchAuthTab('signup'); return false;" style="color:#6366f1;">Create Account</a>
+        </p>
+      </div>
+
+      <div style="margin-top:1.5rem; text-align:center;">
+        <a href="#" onclick="portalGoLanding(); return false;" style="font-size:0.82rem; color: var(--text-muted);">← Back to Home</a>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       PATIENT PORTAL — CLINIC SELECTOR
+       ============================================================ -->
+  <main class="clinic-selector-container hidden" id="view-clinic-selector">
+    <div class="clinic-selector-card">
+      <div style="font-size:2.5rem; margin-bottom:0.75rem; text-align:center;">🏥</div>
+      <h2 style="text-align:center;">Choose Your Clinic</h2>
+      <p class="sub" style="text-align:center;">Select your city and preferred clinic. This can be changed later from your profile.</p>
+
+      <div class="form-group">
+        <label for="selector-city">Select City</label>
+        <select id="selector-city" class="form-control" onchange="onCitySelectorChange()">
+          <option value="">— Choose a city —</option>
+        </select>
+      </div>
+
+      <div id="selector-clinics-list" class="hidden">
+        <div class="form-group">
+          <label>Select Clinic</label>
+          <div id="selector-clinics-options"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-hero-primary" style="width:100%; margin-top:1rem;" id="selector-confirm-btn" onclick="confirmClinicSelection()" disabled>
+        Continue →
+      </button>
+      <div style="margin-top:1rem; text-align:center;">
+        <a href="#" onclick="portalLogout(); return false;" style="font-size:0.82rem; color: var(--text-muted);">← Change account</a>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       PATIENT PORTAL — BOOKING WIZARD (5 STEPS)
+       ============================================================ -->
+  <main class="hidden" id="view-patient-booking" style="display:flex; flex-direction:column; min-height:100vh;">
+    <div class="booking-container">
+
+      <!-- Stepper Progress Bar -->
+      <div class="booking-stepper" id="booking-stepper">
+        <div class="stepper-step active" id="bstep-1">
+          <div class="step-dot">1</div>
+          <div class="step-label">Your Details</div>
+        </div>
+        <div class="stepper-step" id="bstep-2">
+          <div class="step-dot">2</div>
+          <div class="step-label">Speciality</div>
+        </div>
+        <div class="stepper-step" id="bstep-3">
+          <div class="step-dot">3</div>
+          <div class="step-label">Doctor</div>
+        </div>
+        <div class="stepper-step" id="bstep-4">
+          <div class="step-dot">4</div>
+          <div class="step-label">Time Slot</div>
+        </div>
+        <div class="stepper-step" id="bstep-5">
+          <div class="step-dot">5</div>
+          <div class="step-label">Confirm</div>
+        </div>
+      </div>
+
+      <!-- Step 1: Personal Details -->
+      <div class="booking-step-panel" id="booking-panel-1">
+        <h3>Your Details</h3>
+        <p class="step-sub">Please confirm your personal information for this appointment.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="bk-name">Full Name</label>
+            <input type="text" id="bk-name" class="form-control" placeholder="Your full name">
+          </div>
+          <div class="form-group">
+            <label for="bk-age">Age</label>
+            <input type="number" id="bk-age" class="form-control" placeholder="e.g. 32" min="1" max="120">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="bk-gender">Gender</label>
+            <select id="bk-gender" class="form-control">
+              <option value="">— Select —</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bk-phone">Mobile Number</label>
+            <input type="tel" id="bk-phone" class="form-control" placeholder="10-digit mobile">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="bk-address">Address</label>
+          <input type="text" id="bk-address" class="form-control" placeholder="Your home address">
+        </div>
+        <div class="form-group">
+          <label for="bk-reason">Reason for Visit</label>
+          <textarea id="bk-reason" class="form-control" rows="2" placeholder="Briefly describe your symptoms or reason for visit..." style="resize:vertical;"></textarea>
+        </div>
+        <div class="booking-nav-btns">
+          <button class="btn btn-secondary" onclick="portalShowDashboard()">← Cancel</button>
+          <button class="btn btn-hero-primary" onclick="bookingNext(1)">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Choose Speciality -->
+      <div class="booking-step-panel hidden" id="booking-panel-2">
+        <h3>Choose Speciality</h3>
+        <p class="step-sub">What type of doctor do you need to see?</p>
+        <div class="speciality-grid" id="speciality-grid"></div>
+        <div class="booking-nav-btns">
+          <button class="btn btn-secondary" onclick="bookingBack(2)">← Back</button>
+          <button class="btn btn-hero-primary" onclick="bookingNext(2)">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Choose Doctor -->
+      <div class="booking-step-panel hidden" id="booking-panel-3">
+        <h3>Choose Doctor</h3>
+        <p class="step-sub">Select a doctor from your clinic for the chosen speciality.</p>
+        <div class="doctor-cards-list" id="doctor-cards-list"></div>
+        <div class="booking-nav-btns">
+          <button class="btn btn-secondary" onclick="bookingBack(3)">← Back</button>
+          <button class="btn btn-hero-primary" onclick="bookingNext(3)">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Time Slot -->
+      <div class="booking-step-panel hidden" id="booking-panel-4">
+        <h3>Pick a Time Slot</h3>
+        <p class="step-sub">Select your preferred date and time. Green = available, Red = booked.</p>
+        <div class="slot-date-strip" id="slot-date-strip"></div>
+        <div id="slot-sessions-container"></div>
+        <div class="booking-nav-btns">
+          <button class="btn btn-secondary" onclick="bookingBack(4)">← Back</button>
+          <button class="btn btn-hero-primary" onclick="bookingNext(4)">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 5: Review & Confirm -->
+      <div class="booking-step-panel hidden" id="booking-panel-5">
+        <div id="booking-review-content">
+          <h3>Review & Confirm</h3>
+          <p class="step-sub">Please review your appointment details before confirming.</p>
+          <div class="booking-summary-grid" id="booking-summary-grid"></div>
+        </div>
+        <div id="booking-confirmed-panel" class="hidden">
+          <!-- Shown after submission -->
+          <div class="booking-pending-card">
+            <div class="pending-icon">⏳</div>
+            <h3>Booking Submitted!</h3>
+            <p>Your appointment request has been received. The clinic staff will confirm your booking shortly. You'll see the status update in your dashboard.</p>
+            <div class="pending-status-badge">⏳ Awaiting Clinic Confirmation</div>
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-secondary" onclick="portalShowDashboard()">📋 Go to My Records</button>
+              <button class="btn btn-hero-primary" onclick="portalStartBooking()">+ Book Another</button>
+            </div>
+          </div>
+        </div>
+        <div id="booking-submit-panel">
+          <div class="booking-nav-btns">
+            <button class="btn btn-secondary" onclick="bookingBack(5)">← Back</button>
+            <button class="btn btn-hero-primary" id="confirm-booking-btn" onclick="submitBooking()">✅ Confirm Booking</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ============================================================
+       PATIENT PORTAL — DASHBOARD (My Records)
+       ============================================================ -->
+  <main class="hidden" id="view-patient-dashboard" style="display:flex; flex-direction:column; min-height:100vh;">
+    <div class="patient-dashboard">
+
+      <!-- Profile Bar -->
+      <div class="patient-profile-bar" id="patient-profile-bar">
+        <div class="patient-avatar-circle" id="patient-avatar-initials">P</div>
+        <div class="patient-profile-info">
+          <h3 id="profile-display-name">Patient Name</h3>
+          <p id="profile-display-sub">📍 Loading clinic...</p>
+        </div>
+        <div class="patient-profile-actions">
+          <button class="btn btn-tutorial btn-sm" onclick="openTutorialModal('patient')">❓ Help & Tutorial</button>
+          <button class="btn btn-hero-primary" onclick="portalStartBooking()" style="font-size:0.875rem; padding:0.55rem 1.25rem;">+ Book Appointment</button>
+          <button class="btn btn-secondary btn-sm" onclick="openPatientProfileModal()">✏️ Edit Profile</button>
+          <button class="btn btn-secondary btn-sm" onclick="showClinicSelector(true)">🏥 Change Clinic</button>
+        </div>
+      </div>
+
+      <!-- Dashboard Tabs -->
+      <div class="dashboard-tabs-bar">
+        <button class="dashboard-tab-btn active" id="pdash-tab-apts" onclick="switchPatientDashTab('apts')">📅 My Appointments</button>
+        <button class="dashboard-tab-btn" id="pdash-tab-payments" onclick="switchPatientDashTab('payments')">💳 Payment Records</button>
+        <button class="dashboard-tab-btn" id="pdash-tab-rx" onclick="switchPatientDashTab('rx')">📋 My Prescriptions</button>
+      </div>
+
+      <!-- Tab: Appointments -->
+      <div id="pdash-panel-apts">
+        <div id="patient-apts-list" style="display:flex; flex-direction:column; gap:0.85rem;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Tab: Payments -->
+      <div id="pdash-panel-payments" class="hidden">
+        <div id="patient-payments-list" style="display:flex; flex-direction:column; gap:0.85rem;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Tab: Prescriptions -->
+      <div id="pdash-panel-rx" class="hidden">
+        <div id="patient-rx-list" style="display:flex; flex-direction:column; gap:1.25rem;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ============================================================
+       PATIENT PORTAL — UPI PAYMENT MODAL
+       ============================================================ -->
+  <div class="modal-backdrop hidden" id="modal-upi-payment">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>📱 Pay via UPI</h3>
+        <button class="modal-close" onclick="closeModal('modal-upi-payment')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="upi-qr-block">
+          <canvas id="upi-qr-canvas"></canvas>
+          <div class="upi-amount" id="upi-payment-amount">₹0</div>
+          <div class="upi-id-label">Scan QR · UPI ID: <span id="upi-id-display"></span></div>
+          <p style="font-size:0.78rem; color: var(--text-muted); margin-top:0.5rem;">Use any UPI app (GPay, PhonePe, Paytm, BHIM)</p>
+        </div>
+        <div class="form-group" style="margin-top:1rem;">
+          <label>UPI Transaction Reference (optional)</label>
+          <input type="text" id="upi-txn-ref" class="form-control" placeholder="Enter UTR / Transaction ID after payment">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-upi-payment')">Cancel</button>
+        <button class="btn btn-hero-primary" onclick="confirmUpiPayment()">✅ I've Paid</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       PATIENT PORTAL — APPOINTMENT TICKET MODAL
+       ============================================================ -->
+  <div class="modal-backdrop hidden" id="modal-apt-ticket">
+    <div class="modal-content" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3>🎫 Appointment Ticket</h3>
+        <button class="modal-close" onclick="closeModal('modal-apt-ticket')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="appointment-ticket" id="apt-ticket-content">
+          <div class="ticket-header">
+            <div>
+              <h3>MediFlow Appointment</h3>
+              <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">Clinic Confirmed</p>
+            </div>
+            <div class="ticket-id" id="ticket-apt-id">APT-XXXX</div>
+          </div>
+          <div class="ticket-details">
+            <div class="ticket-field">
+              <div class="tf-label">Patient Name</div>
+              <div class="tf-value" id="ticket-patient-name">—</div>
+            </div>
+            <div class="ticket-field">
+              <div class="tf-label">Date & Time</div>
+              <div class="tf-value" id="ticket-datetime">—</div>
+            </div>
+            <div class="ticket-field">
+              <div class="tf-label">Doctor</div>
+              <div class="tf-value" id="ticket-doctor">—</div>
+            </div>
+            <div class="ticket-field">
+              <div class="tf-label">Speciality</div>
+              <div class="tf-value" id="ticket-speciality">—</div>
+            </div>
+            <div class="ticket-field">
+              <div class="tf-label">Clinic</div>
+              <div class="tf-value" id="ticket-clinic">—</div>
+            </div>
+            <div class="ticket-field">
+              <div class="tf-label">Payment</div>
+              <div class="tf-value" id="ticket-payment">—</div>
+            </div>
+          </div>
+          <div class="ticket-footer">
+            <div class="ticket-status-confirmed">✅ Confirmed</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button class="btn btn-secondary" onclick="closeModal('modal-apt-ticket')">Close</button>
+        <a class="btn-whatsapp" id="ticket-whatsapp-btn" href="#" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Share via WhatsApp
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       PATIENT PORTAL — EDIT PROFILE MODAL
+       ============================================================ -->
+  <div class="modal-backdrop hidden" id="modal-patient-profile">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>✏️ Edit Profile</h3>
+        <button class="modal-close" onclick="closeModal('modal-patient-profile')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="edit-profile-name">Full Name</label>
+          <input type="text" id="edit-profile-name" class="form-control">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-profile-age">Age</label>
+            <input type="number" id="edit-profile-age" class="form-control" min="1" max="120">
+          </div>
+          <div class="form-group">
+            <label for="edit-profile-gender">Gender</label>
+            <select id="edit-profile-gender" class="form-control">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-profile-address">Address</label>
+          <input type="text" id="edit-profile-address" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-patient-profile')">Cancel</button>
+        <button class="btn btn-hero-primary" onclick="savePatientProfile()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-doctor-slots: Manage Doctor Slot Configurations -->
+  <div class="modal-backdrop hidden" id="modal-doctor-slots" style="z-index: 1100;">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>⚙️ Manage Doctor Slots</h3>
+        <button class="modal-close" onclick="closeModal('modal-doctor-slots')">&times;</button>
+      </div>
+      <form id="doctor-slots-form">
+        <input type="hidden" id="slots-doc-username">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Doctor Name</label>
+            <div id="slots-doc-name-display" style="font-weight:600; padding:0.5rem 0; font-size:1.1rem; color:var(--accent-color);"></div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="slots-duration">Slot Duration</label>
+              <select id="slots-duration" class="form-control" required>
+                <option value="15">15 Minutes</option>
+                <option value="20">20 Minutes</option>
+                <option value="30" selected>30 Minutes</option>
+                <option value="45">45 Minutes</option>
+                <option value="60">60 Minutes</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Work Days</label>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; background:var(--bg-surface-elevated); border:1px solid var(--border-color); padding:0.75rem; border-radius:var(--radius-sm);">
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;"><input type="checkbox" name="workdays" value="Mon" checked> Mon</label>
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;"><input type="checkbox" name="workdays" value="Tue" checked> Tue</label>
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;"><input type="checkbox" name="workdays" value="Wed" checked> Wed</label>
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;"><input type="checkbox" name="workdays" value="Thu" checked> Thu</label>
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;"><input type="checkbox" name="workdays" value="Fri" checked> Fri</label>
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;"><input type="checkbox" name="workdays" value="Sat"> Sat</label>
+              <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.85rem;"><input type="checkbox" name="workdays" value="Sun"> Sun</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Appointment Sessions (Max 2)</label>
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+              <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-color); padding:0.75rem; border-radius:var(--radius-sm);">
+                <div style="font-weight:600; font-size:0.8rem; margin-bottom:0.5rem; text-transform:uppercase; color:var(--text-muted);">Session 1 (Morning / Default)</div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label style="font-size:0.78rem;">Start Time</label>
+                    <input type="time" id="slots-s1-start" class="form-control" value="09:00">
+                  </div>
+                  <div class="form-group">
+                    <label style="font-size:0.78rem;">End Time</label>
+                    <input type="time" id="slots-s1-end" class="form-control" value="13:00">
+                  </div>
+                </div>
+              </div>
+              <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-color); padding:0.75rem; border-radius:var(--radius-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                  <span style="font-weight:600; font-size:0.8rem; text-transform:uppercase; color:var(--text-muted);">Session 2 (Optional)</span>
+                  <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.78rem; cursor:pointer;"><input type="checkbox" id="slots-s2-active"> Enable</label>
+                </div>
+                <div class="form-row hidden" id="slots-s2-row">
+                  <div class="form-group">
+                    <label style="font-size:0.78rem;">Start Time</label>
+                    <input type="time" id="slots-s2-start" class="form-control" value="17:00">
+                  </div>
+                  <div class="form-group">
+                    <label style="font-size:0.78rem;">End Time</label>
+                    <input type="time" id="slots-s2-end" class="form-control" value="20:00">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-doctor-slots')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Slots Config</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- modal-tutorial: Interactive help & user tutorial walkthroughs -->
+  <div class="modal-backdrop hidden" id="modal-tutorial" style="z-index: 1200;">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header" style="background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color);">
+        <h3 id="tutorial-modal-title">❓ Help & Tutorial Guide</h3>
+        <button class="modal-close" onclick="closeModal('modal-tutorial')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;" id="tutorial-modal-body">
+        <!-- Injected dynamically by app.js -->
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border-color); display:flex; justify-content:flex-end; padding:1rem 1.5rem;">
+        <button type="button" class="btn btn-primary" onclick="closeModal('modal-tutorial')" style="font-weight:700;">Understood, Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-manage-categories: Manage Custom Drug Categories -->
+  <div class="modal-backdrop hidden" id="modal-manage-categories" style="z-index: 1200;">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header" style="background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color);">
+        <h3>📁 Manage Drug Categories</h3>
+        <button class="modal-close" onclick="closeModal('modal-manage-categories')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;">
+        <form id="category-add-form" onsubmit="handleCategoryAdd(event)" style="display:flex; gap:0.5rem; margin-bottom:1.5rem;">
+          <input type="text" id="new-category-name" class="form-control" placeholder="New category name (e.g. Pediatric)..." required style="font-size:0.9rem;">
+          <button type="submit" class="btn btn-primary" style="white-space:nowrap; padding:0.4rem 1.2rem; font-weight:600;">+ Add</button>
+        </form>
+        <div id="categories-list-container" style="max-height: 250px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:0.25rem; background: var(--bg-surface-elevated);">
+          <!-- Dynamic injection of categories -->
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border-color); display:flex; justify-content:flex-end; padding:1rem 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-manage-categories')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal-profile-settings: General Settings Modal -->
+  <div class="modal-backdrop hidden" id="modal-profile-settings" style="z-index: 1300;">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3>⚙️ Profile Settings</h3>
+        <button class="modal-close" onclick="closeModal('modal-profile-settings')">&times;</button>
+      </div>
+      <form id="profile-settings-form" onsubmit="handleProfileSettingsSubmit(event)">
+        <div class="modal-body" style="padding: 1.5rem;">
+          <!-- ID Change Section (Only visible for Super Admin) -->
+          <div class="form-group hidden" id="settings-id-group">
+            <label for="settings-username">Super Admin Username / ID</label>
+            <input type="text" id="settings-username" class="form-control" placeholder="Enter new ID/Username">
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">
+              ⚠️ Changing your ID will require re-authentication with the new ID.
+            </p>
+          </div>
+          
+          <div class="form-group">
+            <label for="settings-current-password">Current Password</label>
+            <input type="password" id="settings-current-password" class="form-control" required placeholder="••••••••">
+          </div>
+          
+          <div class="form-group">
+            <label for="settings-new-password">New Password</label>
+            <input type="password" id="settings-new-password" class="form-control" required placeholder="••••••••">
+          </div>
+
+          <div class="form-group">
+            <label for="settings-confirm-password">Confirm New Password</label>
+            <input type="password" id="settings-confirm-password" class="form-control" required placeholder="••••••••">
+          </div>
+          
+          <div class="alert alert-danger hidden" id="settings-error" style="color:var(--error); font-size:0.85rem; margin-top:0.5rem;">
+            <!-- Error message -->
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top: 1px solid var(--border-color); display:flex; justify-content:flex-end; padding:1rem 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-profile-settings')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="portal-toast" id="portal-toast"></div>
+
 </body>
 </html>

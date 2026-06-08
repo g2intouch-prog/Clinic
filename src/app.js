@@ -15,6 +15,7 @@ let doctorTemplates = [];
 let doctorDrugs = [];
 let doctorTests = [];
 let doctorAdvice = [];
+let doctorDrugCategories = [];
 
 // Initialize Page
 document.addEventListener('DOMContentLoaded', async () => {
@@ -39,36 +40,84 @@ async function checkDBStatus() {
   }
 }
 
+// Hashchange listener for secret admin path access
+window.addEventListener('hashchange', () => {
+  if (window.location.hash.includes('superadmin') && !currentUser && !portalAccount) {
+    showView('view-login');
+  }
+});
+
 // Session Router
 function restoreSession() {
+  const isSuperadminPath = 
+    window.location.pathname.endsWith('/superadmin') || 
+    window.location.pathname.endsWith('/superadmin/') || 
+    window.location.hash.includes('superadmin') || 
+    window.location.search.includes('superadmin');
+
+  // Check for admin/staff/doctor session first
   const cachedUser = sessionStorage.getItem('mediflow_session');
   if (cachedUser) {
     currentUser = JSON.parse(cachedUser);
     loginSuccess(currentUser);
-  } else {
+    return;
+  }
+  // Check for patient session
+  const patientSession = sessionStorage.getItem('mediflow_patient_session');
+  if (patientSession) {
+    const account = JSON.parse(patientSession);
+    portalSessionRestore(account);
+    return;
+  }
+
+  if (isSuperadminPath) {
     showView('view-login');
+  } else {
+    // Default: show landing page
+    showPortalView('view-landing');
   }
 }
 
 function showView(viewId) {
-  // Hide all screens
+  // Hide all admin/staff/doctor screens
   ['view-login', 'view-admin', 'view-clinic-admin', 'view-staff', 'view-doctor'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
-  
+  // Also hide patient nav and patient views
+  const patientNav = document.getElementById('patient-nav');
+  if (patientNav) patientNav.classList.add('hidden');
+  ['view-landing','view-patient-auth','view-clinic-selector','view-patient-booking','view-patient-dashboard'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+
   // Show target screen
   document.getElementById(viewId).classList.remove('fade-in');
   document.getElementById(viewId).classList.remove('hidden');
-  void document.getElementById(viewId).offsetWidth; // trigger reflow
+  void document.getElementById(viewId).offsetWidth;
   document.getElementById(viewId).classList.add('fade-in');
 
   // Toggle main navigation visibility
   const mainNav = document.getElementById('main-nav');
   if (viewId === 'view-login') {
     mainNav.classList.add('hidden');
+
+    // Toggle visibility of Super Admin login button based on url path/hash/search
+    const isSuperadminPath = 
+      window.location.pathname.endsWith('/superadmin') || 
+      window.location.pathname.endsWith('/superadmin/') || 
+      window.location.hash.includes('superadmin') || 
+      window.location.search.includes('superadmin');
+    const adminBtn = document.getElementById('quick-role-admin');
+    if (adminBtn) {
+      if (isSuperadminPath) {
+        adminBtn.classList.remove('hidden');
+      } else {
+        adminBtn.classList.add('hidden');
+      }
+    }
   } else {
     mainNav.classList.remove('hidden');
-    // Set theme class on body
     document.body.className = '';
     if (currentUser) {
       if (currentUser.role === 'admin') document.body.className = 'role-admin';
@@ -77,6 +126,17 @@ function showView(viewId) {
       else if (currentUser.role === 'doctor') document.body.className = 'role-doctor';
     }
   }
+}
+
+// Show clinic admin login (hides all patient UI)
+function showClinicLogin() {
+  ['view-landing','view-patient-auth','view-clinic-selector','view-patient-booking','view-patient-dashboard'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+  const patientNav = document.getElementById('patient-nav');
+  if (patientNav) patientNav.classList.add('hidden');
+  showView('view-login');
 }
 
 // -------------------------------------------------------------
@@ -188,6 +248,25 @@ function setupEventListeners() {
   if (cadminAptBillingSearch) {
     cadminAptBillingSearch.addEventListener('input', renderCadminAppointmentsBilling);
   }
+
+  // Doctor Slots Config (Clinic Admin)
+  const slotsForm = document.getElementById('doctor-slots-form');
+  if (slotsForm) {
+    slotsForm.addEventListener('submit', handleDoctorSlotsSubmit);
+  }
+  const s2Active = document.getElementById('slots-s2-active');
+  if (s2Active) {
+    s2Active.addEventListener('change', (e) => {
+      const s2Row = document.getElementById('slots-s2-row');
+      if (s2Row) {
+        if (e.target.checked) {
+          s2Row.classList.remove('hidden');
+        } else {
+          s2Row.classList.add('hidden');
+        }
+      }
+    });
+  }
 }
 
 // -------------------------------------------------------------
@@ -222,7 +301,30 @@ async function handleLogin(e) {
       return;
     }
 
-    // Check if subscription active for Clinic Admin / Staff / Doctors
+    // Clinic Admin: log directly into their assigned clinic workspace
+    if (user.role === 'clinic_admin') {
+      if (!user.clinicId) {
+        alert('Access Denied: No clinic has been assigned to this administrator. Please contact the Super Admin.');
+        return;
+      }
+      const clinics = await DB.request('getClinics');
+      const assignedClinic = clinics.find(c => c.id === user.clinicId);
+      if (!assignedClinic) {
+        alert('Access Denied: The assigned clinic does not exist in the system database.');
+        return;
+      }
+      if (assignedClinic.subscription !== 'Active') {
+        alert('Access Denied: The assigned clinic subscription is suspended or inactive. Please contact the Super Admin.');
+        return;
+      }
+
+      currentUser = user;
+      sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
+      loginSuccess(currentUser);
+      return;
+    }
+
+    // Check if subscription active for Staff / Doctors
     if (user.clinicId) {
       const clinics = await DB.request('getClinics');
       const clinic = clinics.find(c => c.id === user.clinicId);
@@ -256,6 +358,27 @@ async function handleLogin(e) {
   }
 }
 
+async function confirmClinicAdminLogin() {
+  const dropdown = document.getElementById('login-clinic-dropdown');
+  const selectedClinicId = dropdown.value;
+  if (!selectedClinicId) {
+    alert('Please select a clinic workspace.');
+    return;
+  }
+
+  const user = window._tempLoginUser;
+  if (!user) return;
+
+  // Assign selected clinic workspace context
+  user.clinicId = selectedClinicId;
+  currentUser = user;
+  sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
+  closeModal('modal-login-clinic-select');
+
+  loginSuccess(currentUser);
+  window._tempLoginUser = null;
+}
+
 async function handleLogout() {
   if (currentUser && currentUser.role === 'staff') {
     const attId = sessionStorage.getItem('mediflow_attendance_id');
@@ -278,9 +401,36 @@ async function handleLogout() {
   showView('view-login');
 }
 
-function loginSuccess(user) {
+async function loginSuccess(user) {
+  // Enforce database-assigned clinicId for non-superadmin users to prevent sessionStorage hijacking
+  if (user.role !== 'admin') {
+    const dbUsers = await DB.request('getUsers');
+    const dbUser = dbUsers.find(u => u.username.toLowerCase() === user.username.toLowerCase());
+    if (dbUser) {
+      user.clinicId = dbUser.clinicId;
+      currentUser = user;
+      sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
+    } else {
+      handleLogout();
+      return;
+    }
+  }
+
   // Update header labels
-  document.getElementById('nav-user-name').textContent = user.name;
+  if (user.clinicId) {
+    try {
+      const clinics = await DB.request('getClinics');
+      const clinic = clinics.find(c => c.id === user.clinicId);
+      const clinicName = clinic ? clinic.name : 'Unknown';
+      document.getElementById('nav-user-name').textContent = `${user.name} (${clinicName})`;
+    } catch (e) {
+      document.getElementById('nav-user-name').textContent = user.name;
+    }
+  } else if (user.role === 'admin') {
+    document.getElementById('nav-user-name').textContent = `${user.name} (Super Admin)`;
+  } else {
+    document.getElementById('nav-user-name').textContent = user.name;
+  }
   document.getElementById('nav-user-role').textContent = user.role.replace('_', ' ');
 
   // Toggle Weekly Schedule button visibility (hidden for Super Admin)
@@ -336,13 +486,14 @@ async function loadSuperAdminDashboard() {
     tr.innerHTML = `
       <td><strong>${clinic.id}</strong></td>
       <td>${clinic.name}</td>
+      <td>${clinic.city || '—'}</td>
       <td>
         <span class="user-badge" style="background-color: ${clinic.subscription === 'Active' ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)'}; color: ${clinic.subscription === 'Active' ? '#10b981' : '#f43f5e'}; border: 1px solid rgba(255,255,255,0.05);">
           ${clinic.subscription}
         </span>
       </td>
       <td>
-        <button class="btn btn-secondary btn-sm" onclick="editClinic('${clinic.id}', '${clinic.name}', '${clinic.subscription}')">Edit</button>
+        <button class="btn btn-secondary btn-sm" onclick="editClinic('${clinic.id}')">Edit</button>
         <button class="btn btn-secondary btn-sm btn-danger" onclick="deleteClinic('${clinic.id}')">Delete</button>
       </td>
     `;
@@ -360,7 +511,7 @@ async function loadSuperAdminDashboard() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><strong>${admin.username}</strong></td>
-        <td>${admin.name}</td>
+        <td>${admin.name} <span class="text-muted" style="font-size:0.75rem;">(${clinicName})</span></td>
         <td>${clinicName} (${admin.clinicId})</td>
         <td>
           <span class="user-badge" style="background-color: ${statusText === 'Active' ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)'}; color: ${statusText === 'Active' ? '#10b981' : '#f43f5e'}; border: 1px solid rgba(255,255,255,0.05);">
@@ -389,11 +540,20 @@ async function loadSuperAdminDashboard() {
   renderClinicPayments();
 }
 
-window.editClinic = function(id, name, subscription) {
+window.editClinic = async function(id) {
+  const clinics = await DB.request('getClinics');
+  const clinic = clinics.find(c => c.id === id);
+  if (!clinic) return;
+
   document.getElementById('clinic-modal-title').textContent = 'Modify Clinic Profile';
-  document.getElementById('clinic-form-id').value = id;
-  document.getElementById('clinic-form-name').value = name;
-  document.getElementById('clinic-form-subscription').value = subscription;
+  document.getElementById('clinic-form-id').value = clinic.id;
+  document.getElementById('clinic-form-name').value = clinic.name;
+  document.getElementById('clinic-form-subscription').value = clinic.subscription;
+  document.getElementById('clinic-form-city').value = clinic.city || '';
+  document.getElementById('clinic-form-address').value = clinic.address || '';
+  document.getElementById('clinic-form-phone').value = clinic.phone || '';
+  document.getElementById('clinic-form-upi').value = clinic.upiId || '';
+  document.getElementById('clinic-form-fee').value = clinic.consultationFee || 0;
   openModal('modal-clinic');
 };
 
@@ -416,8 +576,23 @@ async function handleClinicSubmit(e) {
   const id = document.getElementById('clinic-form-id').value || `clinic-${Date.now()}`;
   const name = document.getElementById('clinic-form-name').value.trim();
   const subscription = document.getElementById('clinic-form-subscription').value;
+  const city = document.getElementById('clinic-form-city').value.trim();
+  const address = document.getElementById('clinic-form-address').value.trim();
+  const phone = document.getElementById('clinic-form-phone').value.trim();
+  const upiId = document.getElementById('clinic-form-upi').value.trim();
+  const consultationFee = parseFloat(document.getElementById('clinic-form-fee').value) || 0;
 
-  await DB.request('saveClinic', { id, name, subscription, logoUrl: '' });
+  await DB.request('saveClinic', { 
+    id, 
+    name, 
+    subscription, 
+    logoUrl: '',
+    city,
+    address,
+    phone,
+    upiId,
+    consultationFee
+  });
   closeModal('modal-clinic');
   loadSuperAdminDashboard();
 }
@@ -458,7 +633,7 @@ async function loadClinicAdminDashboardCore() {
 
     tr.innerHTML = `
       <td><strong>${user.username}</strong></td>
-      <td>${user.name}</td>
+      <td>${user.name} <span class="text-muted" style="font-size:0.75rem;">(${clinic ? clinic.name : 'Unknown'})</span></td>
       <td>
         <span class="user-badge" style="background: ${user.role === 'doctor' ? 'rgba(56,189,248,0.1)' : 'rgba(129,140,248,0.1)'}; color: ${user.role === 'doctor' ? '#38bdf8' : '#818cf8'}; border: 1px solid rgba(255,255,255,0.05);">
           ${user.role.toUpperCase()}
@@ -472,6 +647,7 @@ async function loadClinicAdminDashboardCore() {
       <td>
         <div style="display:flex; gap:0.25rem;">
           <button class="btn btn-secondary btn-sm" onclick="editUser('${user.username}', '${user.name}', '${user.role}', '${user.qualification || ''}', '${user.designation || ''}')">Edit</button>
+          ${user.role === 'doctor' ? `<button class="btn btn-secondary btn-sm" style="border-color:#38bdf8; color:#a5f3fc;" onclick="openDoctorSlotsModal('${user.username}', '${user.name.replace(/'/g, "\\'")}')">Slots</button>` : ''}
           <button class="btn btn-secondary btn-sm" style="background:${userStatus === 'Active' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}; color:${userStatus === 'Active' ? '#f59e0b' : '#10b981'};" onclick="toggleUserLeave('${user.username}')">
             ${userStatus === 'Active' ? 'Leave' : 'Active'}
           </button>
@@ -496,6 +672,14 @@ async function loadClinicAdminDashboardCore() {
   }
 }
 
+async function populateUserFormSpecialityOptions() {
+  const select = document.getElementById('user-form-speciality');
+  if (!select) return;
+  const specs = await DB.request('getSpecialities', { clinicId: currentUser.clinicId });
+  select.innerHTML = '<option value="">— Select Speciality —</option>' +
+    specs.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+}
+
 window.editUser = async function(username, name, role, qual, desig) {
   document.getElementById('user-modal-title').textContent = 'Modify User Profile';
   document.getElementById('user-form-username').value = username;
@@ -507,12 +691,16 @@ window.editUser = async function(username, name, role, qual, desig) {
   document.getElementById('user-form-qual').value = qual;
   document.getElementById('user-form-desig').value = desig;
   
-  // Prefill permissions if staff
+  // Prefill permissions and speciality (need full user object)
   const users = await DB.request('getUsers');
   const user = users.find(u => u.username === username);
   const perms = (user && user.permissions) || [];
   document.getElementById('user-perm-reception').checked = perms.includes('reception');
   document.getElementById('user-perm-finance').checked = perms.includes('finance');
+  
+  await populateUserFormSpecialityOptions();
+  const specialityEl = document.getElementById('user-form-speciality');
+  if (specialityEl && user) specialityEl.value = user.speciality || '';
 
   toggleDoctorCustomFields();
   openModal('modal-user');
@@ -529,11 +717,13 @@ async function deleteUser(username) {
   }
 }
 
-function openUserModal() {
+async function openUserModal() {
   document.getElementById('user-modal-title').textContent = 'Add Clinic User Profile';
   document.getElementById('user-form-username').removeAttribute('disabled');
   document.getElementById('user-form-password').setAttribute('required', 'true');
   document.getElementById('user-form').reset();
+  
+  await populateUserFormSpecialityOptions();
   
   // Default staff permissions checked
   document.getElementById('user-perm-reception').checked = true;
@@ -565,6 +755,7 @@ async function handleUserSubmit(e) {
   
   const qualification = role === 'doctor' ? document.getElementById('user-form-qual').value.trim() : '';
   const designation = role === 'doctor' ? document.getElementById('user-form-desig').value.trim() : '';
+  const speciality = role === 'doctor' ? (document.getElementById('user-form-speciality') ? document.getElementById('user-form-speciality').value.trim() : '') : '';
 
   // Gather permissions if staff
   const permissions = [];
@@ -596,6 +787,7 @@ async function handleUserSubmit(e) {
     name,
     qualification,
     designation,
+    speciality,
     permissions
   });
 
@@ -793,11 +985,34 @@ async function loadDoctorConfigs() {
   doctorDrugs = await DB.request('getDrugs', reqArgs);
   doctorTests = await DB.request('getTests', reqArgs);
   doctorAdvice = await DB.request('getAdvice', reqArgs);
+  doctorDrugCategories = await DB.request('getDrugCategories', reqArgs);
+
+  populateDoctorDrugCategoryDropdowns();
 
   renderDoctorTemplates();
   renderDoctorDrugs();
   renderDoctorTests();
   renderDoctorAdvice();
+}
+
+function populateDoctorDrugCategoryDropdowns() {
+  const selectFilter = document.getElementById('drug-category-selector');
+  const selectModal = document.getElementById('doc-item-drug-category');
+  
+  if (selectFilter) {
+    const prevVal = selectFilter.value;
+    selectFilter.innerHTML = '<option value="All">All Categories</option>' +
+      doctorDrugCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    if (doctorDrugCategories.some(c => c.name === prevVal)) {
+      selectFilter.value = prevVal;
+    } else {
+      selectFilter.value = 'All';
+    }
+  }
+  
+  if (selectModal) {
+    selectModal.innerHTML = doctorDrugCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }
 }
 
 // Patient search queue
@@ -963,7 +1178,10 @@ function renderDoctorDrugs() {
     pill.className = 'pill-item';
     pill.innerHTML = `
       <span>${d.name}</span>
-      <span class="pill-delete" onclick="event.stopPropagation(); deleteDoctorItem('drug', '${d.id}')">&times;</span>
+      <span class="pill-actions">
+        <span class="pill-edit" onclick="event.stopPropagation(); editDoctorItem('drug', '${d.id}')">✏️</span>
+        <span class="pill-delete" onclick="event.stopPropagation(); deleteDoctorItem('drug', '${d.id}')">&times;</span>
+      </span>
     `;
     pill.addEventListener('click', () => appendDrugToPrescription(d.name));
     listContainer.appendChild(pill);
@@ -994,7 +1212,10 @@ function renderDoctorTests() {
     
     pill.innerHTML = `
       <span>${t.name}</span>
-      <span class="pill-delete" onclick="event.stopPropagation(); deleteDoctorItem('test', '${t.id}')">&times;</span>
+      <span class="pill-actions">
+        <span class="pill-edit" onclick="event.stopPropagation(); editDoctorItem('test', '${t.id}')">✏️</span>
+        <span class="pill-delete" onclick="event.stopPropagation(); deleteDoctorItem('test', '${t.id}')">&times;</span>
+      </span>
     `;
     pill.addEventListener('click', () => toggleLabTest(t.id));
     listContainer.appendChild(pill);
@@ -1060,7 +1281,10 @@ function renderDoctorAdvice() {
 
     pill.innerHTML = `
       <span>${a.name}</span>
-      <span class="pill-delete" onclick="event.stopPropagation(); deleteDoctorItem('advice', '${a.id}')">&times;</span>
+      <span class="pill-actions">
+        <span class="pill-edit" onclick="event.stopPropagation(); editDoctorItem('advice', '${a.id}')">✏️</span>
+        <span class="pill-delete" onclick="event.stopPropagation(); deleteDoctorItem('advice', '${a.id}')">&times;</span>
+      </span>
     `;
     pill.addEventListener('click', () => toggleAdvice(a.id));
     listContainer.appendChild(pill);
@@ -1163,6 +1387,112 @@ window.editDoctorItem = function(type, id) {
       document.getElementById('doc-item-diagnosis').value = t.findingsDiagnosis || '';
       document.getElementById('doc-item-rx').value = t.prescriptionBody || '';
     }
+  } else if (type === 'drug') {
+    document.getElementById('doc-item-title').textContent = 'Edit Drug Directory Entry';
+    const d = doctorDrugs.find(item => item.id === id);
+    if (d) {
+      document.getElementById('doc-item-name').value = d.name;
+      document.getElementById('doc-item-drug-category').value = d.category || '';
+    }
+  } else if (type === 'test') {
+    document.getElementById('doc-item-title').textContent = 'Edit Diagnostic Lab Order';
+    const t = doctorTests.find(item => item.id === id);
+    if (t) {
+      document.getElementById('doc-item-name').value = t.name;
+    }
+  } else if (type === 'advice') {
+    document.getElementById('doc-item-title').textContent = 'Edit Special Advice Template';
+    const a = doctorAdvice.find(item => item.id === id);
+    if (a) {
+      document.getElementById('doc-item-name').value = a.name;
+      document.getElementById('doc-item-advice-text').value = a.text || '';
+    }
+  }
+};
+
+window.openCategoriesModal = async function() {
+  const reqArgs = { doctorUsername: currentUser.username, clinicId: currentUser.clinicId };
+  doctorDrugCategories = await DB.request('getDrugCategories', reqArgs);
+  
+  const container = document.getElementById('categories-list-container');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  if (doctorDrugCategories.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:1rem; color:var(--text-muted); font-style:italic;">No custom categories. Add one above!</div>';
+  } else {
+    doctorDrugCategories.forEach(cat => {
+      const item = document.createElement('div');
+      item.className = 'category-list-item';
+      item.innerHTML = `
+        <span>${cat.name}</span>
+        <div class="category-item-actions">
+          <button type="button" class="category-item-btn" onclick="editDrugCategory('${cat.id}', '${cat.name}')">✏️</button>
+          <button type="button" class="category-item-btn" onclick="deleteDrugCategory('${cat.id}', '${cat.name}')">🗑️</button>
+        </div>
+      `;
+      container.appendChild(item);
+    });
+  }
+  
+  openModal('modal-manage-categories');
+};
+
+window.handleCategoryAdd = async function(e) {
+  e.preventDefault();
+  const input = document.getElementById('new-category-name');
+  const name = input.value.trim();
+  if (!name) return;
+  
+  const reqArgs = {
+    id: 'cat-' + Date.now(),
+    doctorUsername: currentUser.username,
+    clinicId: currentUser.clinicId,
+    name
+  };
+  
+  await DB.request('saveDrugCategory', reqArgs);
+  input.value = '';
+  
+  await loadDoctorConfigs();
+  window.openCategoriesModal();
+};
+
+window.editDrugCategory = async function(catId, oldName) {
+  const newName = prompt("Enter new category name:", oldName);
+  if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+  
+  await DB.request('saveDrugCategory', {
+    id: catId,
+    doctorUsername: currentUser.username,
+    clinicId: currentUser.clinicId,
+    name: newName.trim()
+  });
+  
+  // Cascade category change to all drugs of this doctor
+  const drugsToUpdate = doctorDrugs.filter(d => d.category === oldName);
+  for (const d of drugsToUpdate) {
+    d.category = newName.trim();
+    await DB.request('saveDrug', d);
+  }
+  
+  await loadDoctorConfigs();
+  window.openCategoriesModal();
+};
+
+window.deleteDrugCategory = async function(catId, catName) {
+  if (confirm(`Are you sure you want to delete category "${catName}"? Associated drugs will be uncategorized.`)) {
+    await DB.request('deleteDrugCategory', { id: catId });
+    
+    // Cascade category deletion: update drugs to 'General' category
+    const drugsToUpdate = doctorDrugs.filter(d => d.category === catName);
+    for (const d of drugsToUpdate) {
+      d.category = 'General';
+      await DB.request('saveDrug', d);
+    }
+    
+    await loadDoctorConfigs();
+    window.openCategoriesModal();
   }
 };
 
@@ -1461,7 +1791,13 @@ async function loadAppointments() {
     
     let badgeBg = 'rgba(245,158,11,0.1)';
     let badgeColor = '#f59e0b';
-    if (apt.status === 'Checked In') {
+    if (apt.status === 'Scheduled') {
+      badgeBg = 'rgba(129,140,248,0.1)'; // Indigo
+      badgeColor = '#818cf8';
+    } else if (apt.status === 'Confirmed') {
+      badgeBg = 'rgba(168,85,247,0.1)'; // Purple
+      badgeColor = '#a855f7';
+    } else if (apt.status === 'Checked In') {
       badgeBg = 'rgba(56,189,248,0.1)';
       badgeColor = '#38bdf8';
     } else if (apt.status === 'Completed') {
@@ -1470,6 +1806,9 @@ async function loadAppointments() {
     } else if (apt.status === 'Cancelled') {
       badgeBg = 'rgba(244,63,94,0.1)';
       badgeColor = '#f43f5e';
+    } else if (apt.status === 'Pending Confirmation') {
+      badgeBg = 'rgba(245,158,11,0.1)';
+      badgeColor = '#f59e0b';
     }
 
     tr.innerHTML = `
@@ -1485,7 +1824,8 @@ async function loadAppointments() {
       </td>
       <td>
         <div style="display:flex; gap:0.25rem;">
-          ${apt.status === 'Scheduled' ? `<button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.4rem; font-size:0.75rem;" onclick="updateAptStatus('${apt.id}', 'Checked In')">📥 Check In</button>` : ''}
+          ${apt.status === 'Pending Confirmation' ? `<button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.4rem; font-size:0.75rem; background:rgba(16,185,129,0.2); color:#10b981; border-color:#10b981;" onclick="confirmPatientAppointment('${apt.id}')">✓ Accept</button>` : ''}
+          ${(apt.status === 'Scheduled' || apt.status === 'Confirmed') ? `<button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.4rem; font-size:0.75rem;" onclick="updateAptStatus('${apt.id}', 'Checked In')">📥 Check In</button>` : ''}
           ${apt.status === 'Checked In' ? `<button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.4rem; font-size:0.75rem; background:rgba(16,185,129,0.2);" onclick="updateAptStatus('${apt.id}', 'Completed')">✓ Complete</button>` : ''}
           ${apt.status !== 'Completed' && apt.status !== 'Cancelled' ? `<button class="btn btn-secondary btn-sm btn-danger" style="padding:0.2rem 0.4rem; font-size:0.75rem;" onclick="updateAptStatus('${apt.id}', 'Cancelled')">Cancel</button>` : ''}
           <button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.4rem; font-size:0.75rem;" onclick="editAppointment('${apt.id}')">✏️</button>
@@ -2021,6 +2361,7 @@ window.switchCadminTab = function(tabName) {
   document.getElementById('panel-cadmin-attendance').classList.add('hidden');
   document.getElementById('panel-cadmin-performance').classList.add('hidden');
   document.getElementById('panel-cadmin-apt-billing').classList.add('hidden');
+  document.getElementById('panel-cadmin-specialities').classList.add('hidden');
 
   if (tabName === 'users') {
     document.getElementById('btn-cadmin-tab-users').classList.add('active');
@@ -2046,6 +2387,82 @@ window.switchCadminTab = function(tabName) {
     document.getElementById('btn-cadmin-tab-apt-billing').classList.add('active');
     document.getElementById('panel-cadmin-apt-billing').classList.remove('hidden');
     renderCadminAppointmentsBilling();
+  } else if (tabName === 'specialities') {
+    document.getElementById('btn-cadmin-tab-specialities').classList.add('active');
+    document.getElementById('panel-cadmin-specialities').classList.remove('hidden');
+    renderCadminSpecialities();
+  }
+};
+
+window.renderCadminSpecialities = async function() {
+  const tableBody = document.querySelector('#cadmin-specialities-table tbody');
+  if (!tableBody) return;
+  tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>';
+  
+  const specs = await DB.request('getSpecialities', { clinicId: currentUser.clinicId });
+  tableBody.innerHTML = '';
+  
+  if (specs.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No specialities configured. Add one to get started!</td></tr>';
+    return;
+  }
+  
+  specs.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:600; color:var(--text-main);">${s.name}</td>
+      <td style="font-size:1.5rem; text-align:center; width: 100px;">${s.icon}</td>
+      <td style="width: 180px; text-align: right;">
+        <button class="btn btn-secondary btn-sm" onclick="openEditSpecialityModal('${s.name}', '${s.icon}')" style="margin-right:0.25rem;">✏️ Edit</button>
+        <button class="btn btn-secondary btn-sm btn-danger" onclick="deleteCadminSpeciality('${s.name}')">🗑️ Delete</button>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+};
+
+window.openAddSpecialityModal = function() {
+  document.getElementById('speciality-modal-title').textContent = 'Add New Speciality';
+  document.getElementById('speciality-form-old-name').value = '';
+  document.getElementById('speciality-form-name').value = '';
+  document.getElementById('speciality-form-icon').value = '';
+  openModal('modal-speciality');
+};
+
+window.openEditSpecialityModal = function(name, icon) {
+  document.getElementById('speciality-modal-title').textContent = 'Modify Speciality';
+  document.getElementById('speciality-form-old-name').value = name;
+  document.getElementById('speciality-form-name').value = name;
+  document.getElementById('speciality-form-icon').value = icon;
+  openModal('modal-speciality');
+};
+
+window.handleSpecialitySubmit = async function(e) {
+  e.preventDefault();
+  const oldName = document.getElementById('speciality-form-old-name').value;
+  const name = document.getElementById('speciality-form-name').value.trim();
+  const icon = document.getElementById('speciality-form-icon').value.trim();
+  
+  if (!name || !icon) return;
+  
+  await DB.request('saveSpeciality', {
+    clinicId: currentUser.clinicId,
+    name,
+    icon,
+    oldName: oldName || null
+  });
+  
+  closeModal('modal-speciality');
+  renderCadminSpecialities();
+};
+
+window.deleteCadminSpeciality = async function(name) {
+  if (confirm(`Are you sure you want to delete "${name}"? Doctors currently assigned to this speciality will be set to empty.`)) {
+    await DB.request('deleteSpeciality', {
+      clinicId: currentUser.clinicId,
+      name
+    });
+    renderCadminSpecialities();
   }
 };
 
@@ -2090,7 +2507,13 @@ window.renderCadminAppointments = async function() {
     const tr = document.createElement('tr');
     let badgeBg = 'rgba(245,158,11,0.1)';
     let badgeColor = '#f59e0b';
-    if (apt.status === 'Checked In') {
+    if (apt.status === 'Scheduled') {
+      badgeBg = 'rgba(129,140,248,0.1)'; // Indigo
+      badgeColor = '#818cf8';
+    } else if (apt.status === 'Confirmed') {
+      badgeBg = 'rgba(168,85,247,0.1)'; // Purple
+      badgeColor = '#a855f7';
+    } else if (apt.status === 'Checked In') {
       badgeBg = 'rgba(56,189,248,0.1)';
       badgeColor = '#38bdf8';
     } else if (apt.status === 'Completed') {
@@ -2099,6 +2522,9 @@ window.renderCadminAppointments = async function() {
     } else if (apt.status === 'Cancelled') {
       badgeBg = 'rgba(244,63,94,0.1)';
       badgeColor = '#f43f5e';
+    } else if (apt.status === 'Pending Confirmation') {
+      badgeBg = 'rgba(245,158,11,0.1)';
+      badgeColor = '#f59e0b';
     }
 
     tr.innerHTML = `
@@ -3012,6 +3438,119 @@ window.handleCellEditSubmit = async function(e) {
   alert("Success: Shift roster updated.");
 };
 
+window.openDoctorSlotsModal = async function(username, name) {
+  // Set hidden inputs / title
+  document.getElementById('slots-doc-username').value = username;
+  document.getElementById('slots-doc-name-display').textContent = name;
+
+  // Retrieve current configuration
+  const slotConfig = await DB.request('getDoctorSlotConfig', {
+    doctorUsername: username,
+    clinicId: currentUser.clinicId
+  });
+
+  // Setup form fields with current config or default settings
+  if (slotConfig) {
+    document.getElementById('slots-duration').value = slotConfig.slotDuration || 30;
+    
+    // Checkboxes for workdays
+    const workdaysArr = slotConfig.workDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    document.querySelectorAll('#doctor-slots-form input[name="workdays"]').forEach(cb => {
+      cb.checked = workdaysArr.includes(cb.value);
+    });
+
+    // Sessions
+    const sessions = slotConfig.sessions || [];
+    if (sessions.length > 0) {
+      document.getElementById('slots-s1-start').value = sessions[0].start || '09:00';
+      document.getElementById('slots-s1-end').value = sessions[0].end || '13:00';
+    } else {
+      document.getElementById('slots-s1-start').value = '09:00';
+      document.getElementById('slots-s1-end').value = '13:00';
+    }
+
+    if (sessions.length > 1) {
+      document.getElementById('slots-s2-active').checked = true;
+      document.getElementById('slots-s2-row').classList.remove('hidden');
+      document.getElementById('slots-s2-start').value = sessions[1].start || '17:00';
+      document.getElementById('slots-s2-end').value = sessions[1].end || '20:00';
+    } else {
+      document.getElementById('slots-s2-active').checked = false;
+      document.getElementById('slots-s2-row').classList.add('hidden');
+      document.getElementById('slots-s2-start').value = '17:00';
+      document.getElementById('slots-s2-end').value = '20:00';
+    }
+  } else {
+    // Defaults
+    document.getElementById('slots-duration').value = 30;
+    document.querySelectorAll('#doctor-slots-form input[name="workdays"]').forEach(cb => {
+      cb.checked = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(cb.value);
+    });
+    document.getElementById('slots-s1-start').value = '09:00';
+    document.getElementById('slots-s1-end').value = '13:00';
+    
+    document.getElementById('slots-s2-active').checked = false;
+    document.getElementById('slots-s2-row').classList.add('hidden');
+    document.getElementById('slots-s2-start').value = '17:00';
+    document.getElementById('slots-s2-end').value = '20:00';
+  }
+
+  openModal('modal-doctor-slots');
+};
+
+window.handleDoctorSlotsSubmit = async function(e) {
+  e.preventDefault();
+  
+  const username = document.getElementById('slots-doc-username').value;
+  const slotDuration = parseInt(document.getElementById('slots-duration').value) || 30;
+  
+  // Workdays
+  const checkedBoxes = document.querySelectorAll('#doctor-slots-form input[name="workdays"]:checked');
+  const workDays = Array.from(checkedBoxes).map(cb => cb.value);
+  
+  if (workDays.length === 0) {
+    alert("Please select at least one workday.");
+    return;
+  }
+  
+  // Sessions
+  const s1Start = document.getElementById('slots-s1-start').value;
+  const s1End = document.getElementById('slots-s1-end').value;
+  
+  if (!s1Start || !s1End) {
+    alert("Please enter both start and end times for Session 1.");
+    return;
+  }
+  
+  const sessions = [
+    { label: 'Morning', start: s1Start, end: s1End }
+  ];
+  
+  const s2Active = document.getElementById('slots-s2-active').checked;
+  if (s2Active) {
+    const s2Start = document.getElementById('slots-s2-start').value;
+    const s2End = document.getElementById('slots-s2-end').value;
+    if (!s2Start || !s2End) {
+      alert("Please enter both start and end times for Session 2.");
+      return;
+    }
+    sessions.push({ label: 'Evening', start: s2Start, end: s2End });
+  }
+  
+  const payload = {
+    clinicId: currentUser.clinicId,
+    doctorUsername: username,
+    slotDuration,
+    workDays,
+    sessions
+  };
+  
+  await DB.request('saveDoctorSlotConfig', payload);
+  
+  closeModal('modal-doctor-slots');
+  showPortalToast('Doctor slot configuration saved successfully!', 'success');
+};
+
 
 // --- J. Clinic Internal Staff Room Chat & Audio Notifications ---
 let activeChatInterval = null;
@@ -3603,4 +4142,1340 @@ window.renderChatAuditLog = async function() {
 };
 
 
+// =============================================================
+// PATIENT PUBLIC PORTAL MODULE
+// =============================================================
+
+// --- Portal State ---
+let portalAccount = null;       // logged-in patient account
+let portalClinic = null;        // selected clinic object
+let bookingState = {            // booking wizard state
+  step: 1,
+  name: '', age: '', gender: '', phone: '', address: '', reason: '',
+  speciality: '', doctorUsername: '', doctorName: '',
+  date: '', time: '',
+  currentDate: null
+};
+let currentUpiAppointmentId = null;
+
+const SPECIALITY_ICONS = {
+  'General Medicine': '🩺',
+  'ENT': '👂',
+  'Dental': '🦷',
+  'Dermatology': '🧴',
+  'Ophthalmology': '👁️',
+  'Orthopaedics': '🦴',
+  'Gynaecology': '👩‍⚕️',
+  'Paediatrics': '👶',
+  'Cardiology': '❤️',
+  'Neurology': '🧠',
+};
+
+// --- Portal View Router ---
+function showPortalView(viewId) {
+  // Hide ALL admin views
+  ['view-login','view-admin','view-clinic-admin','view-staff','view-doctor'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+  document.getElementById('main-nav').classList.add('hidden');
+
+  // Hide ALL patient portal views
+  ['view-landing','view-patient-auth','view-clinic-selector','view-patient-booking','view-patient-dashboard'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+
+  // Patient nav visibility
+  const patientNav = document.getElementById('patient-nav');
+  if (viewId === 'view-landing') {
+    patientNav.classList.add('hidden');
+  } else {
+    patientNav.classList.remove('hidden');
+    updatePatientNav();
+  }
+
+  // Show the requested view
+  const target = document.getElementById(viewId);
+  if (target) {
+    target.classList.remove('hidden');
+    window.scrollTo(0, 0);
+  }
+}
+
+async function updatePatientNav() {
+  const greeting = document.getElementById('patient-nav-greeting');
+  const nameEl   = document.getElementById('patient-nav-name');
+  const dashBtn  = document.getElementById('patient-dashboard-btn');
+  const bookBtn  = document.getElementById('patient-book-btn');
+  const settingsBtn = document.getElementById('patient-settings-btn');
+  const logoutBtn= document.getElementById('patient-logout-btn');
+  const signinBtn= document.getElementById('patient-signin-nav-btn');
+
+  if (portalAccount) {
+    greeting.classList.remove('hidden');
+    
+    let clinicName = '';
+    if (portalAccount.clinicId) {
+      try {
+        const clinics = await DB.request('getClinics');
+        const clinic = clinics.find(c => c.id === portalAccount.clinicId);
+        if (clinic) {
+          clinicName = ` (${clinic.name})`;
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    
+    nameEl.textContent = portalAccount.name.split(' ')[0] + clinicName;
+    dashBtn.classList.remove('hidden');
+    bookBtn.classList.remove('hidden');
+    if (settingsBtn) settingsBtn.classList.remove('hidden');
+    logoutBtn.classList.remove('hidden');
+    signinBtn.classList.add('hidden');
+  } else {
+    greeting.classList.add('hidden');
+    dashBtn.classList.add('hidden');
+    bookBtn.classList.add('hidden');
+    if (settingsBtn) settingsBtn.classList.add('hidden');
+    logoutBtn.classList.add('hidden');
+    signinBtn.classList.remove('hidden');
+  }
+}
+
+// --- Landing Page ---
+function portalGoLanding() {
+  showPortalView('view-landing');
+  initLandingStats();
+}
+
+async function initLandingStats() {
+  const clinics = await DB.request('getClinics');
+  const users   = await DB.request('getUsers');
+  const doctors = users.filter(u => u.role === 'doctor');
+  const elC = document.getElementById('stat-clinics-hero');
+  const elD = document.getElementById('stat-doctors-hero');
+  if (elC) elC.textContent = clinics.length + '+';
+  if (elD) elD.textContent = doctors.length + '+';
+}
+
+// --- Auth ---
+function portalShowAuth(tab = 'signup') {
+  showPortalView('view-patient-auth');
+  switchAuthTab(tab);
+}
+
+function switchAuthTab(tab) {
+  const signupForm = document.getElementById('patient-signup-form');
+  const signinForm = document.getElementById('patient-signin-form');
+  const tabSignup  = document.getElementById('auth-tab-signup');
+  const tabSignin  = document.getElementById('auth-tab-signin');
+  if (tab === 'signup') {
+    signupForm.classList.remove('hidden');
+    signinForm.classList.add('hidden');
+    tabSignup.classList.add('active');
+    tabSignin.classList.remove('active');
+  } else {
+    signupForm.classList.add('hidden');
+    signinForm.classList.remove('hidden');
+    tabSignup.classList.remove('active');
+    tabSignin.classList.add('active');
+  }
+}
+
+async function handlePatientSignup() {
+  const name    = document.getElementById('signup-name').value.trim();
+  const phone   = document.getElementById('signup-phone').value.trim();
+  const pass    = document.getElementById('signup-password').value;
+  const confirm = document.getElementById('signup-confirm-password').value;
+
+  if (!name || !phone || !pass) { showPortalToast('Please fill all fields.', 'error'); return; }
+  const disclaimerChecked = document.getElementById('signup-disclaimer').checked;
+  if (!disclaimerChecked) { showPortalToast('Please accept the simulation disclaimer to sign up.', 'error'); return; }
+  if (phone.length < 10) { showPortalToast('Enter a valid 10-digit mobile number.', 'error'); return; }
+  if (pass !== confirm)  { showPortalToast('Passwords do not match.', 'error'); return; }
+
+  const existing = await DB.request('getPatientAccountByPhone', { phone });
+  if (existing) { showPortalToast('Account already exists. Please sign in.', 'error'); return; }
+
+  const account = {
+    id: `PA-${Date.now()}`,
+    name, phone, password: pass,
+    age: '', gender: '', address: '',
+    clinicId: null, city: null,
+    createdAt: new Date().toISOString()
+  };
+  await DB.request('savePatientAccount', account);
+  portalAccount = account;
+  sessionStorage.setItem('mediflow_patient_session', JSON.stringify(account));
+  showPortalToast('Account created! Now choose your clinic.', 'success');
+  setTimeout(() => showClinicSelector(false), 600);
+}
+
+async function handlePatientSignin() {
+  const phone = document.getElementById('signin-phone').value.trim();
+  const pass  = document.getElementById('signin-password').value;
+
+  if (!phone || !pass) { showPortalToast('Please fill all fields.', 'error'); return; }
+  const disclaimerChecked = document.getElementById('signin-disclaimer').checked;
+  if (!disclaimerChecked) { showPortalToast('Please accept the simulation disclaimer to sign in.', 'error'); return; }
+
+  const account = await DB.request('getPatientAccountByPhone', { phone });
+  if (!account || account.password !== pass) {
+    showPortalToast('Invalid mobile number or password.', 'error');
+    return;
+  }
+
+  portalAccount = account;
+  sessionStorage.setItem('mediflow_patient_session', JSON.stringify(account));
+  showPortalToast('Signed in successfully!', 'success');
+  setTimeout(() => {
+    if (!account.clinicId) {
+      showClinicSelector(false);
+    } else {
+      portalShowDashboard();
+    }
+  }, 500);
+}
+
+function portalLogout() {
+  portalAccount = null;
+  portalClinic  = null;
+  sessionStorage.removeItem('mediflow_patient_session');
+  portalGoLanding();
+}
+
+function portalSessionRestore(account) {
+  portalAccount = account;
+  if (!account.clinicId) {
+    showClinicSelector(false);
+  } else {
+    portalShowDashboard();
+  }
+}
+
+// --- Clinic Selector ---
+async function showClinicSelector(allowSkip = false) {
+  showPortalView('view-clinic-selector');
+  const clinics = await DB.request('getClinics');
+
+  // Populate city dropdown
+  const citySelect = document.getElementById('selector-city');
+  const cities = [...new Set(clinics.map(c => c.city).filter(Boolean))].sort();
+  citySelect.innerHTML = '<option value="">— Choose a city —</option>' +
+    cities.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  // Reset
+  document.getElementById('selector-clinics-list').classList.add('hidden');
+  document.getElementById('selector-confirm-btn').disabled = true;
+  window._selectorClinics = clinics;
+  window._selectorSelectedClinic = null;
+}
+
+async function onCitySelectorChange() {
+  const city = document.getElementById('selector-city').value;
+  const clinicsDiv = document.getElementById('selector-clinics-list');
+  const optionsDiv = document.getElementById('selector-clinics-options');
+
+  if (!city) { clinicsDiv.classList.add('hidden'); return; }
+
+  const clinics = (window._selectorClinics || []).filter(c => c.city === city);
+  clinicsDiv.classList.remove('hidden');
+  window._selectorSelectedClinic = null;
+  document.getElementById('selector-confirm-btn').disabled = true;
+
+  optionsDiv.innerHTML = clinics.map(c => `
+    <div class="clinic-option-card" id="clinic-opt-${c.id}" onclick="selectClinicOption('${c.id}')">
+      <div class="clinic-icon">🏥</div>
+      <div class="clinic-info">
+        <h4>${c.name}</h4>
+        <p>${c.address || city}</p>
+      </div>
+    </div>
+  `).join('') || '<p style="color:var(--text-muted); font-size:0.875rem;">No clinics found in this city.</p>';
+}
+
+function selectClinicOption(clinicId) {
+  document.querySelectorAll('.clinic-option-card').forEach(el => el.classList.remove('selected'));
+  const card = document.getElementById(`clinic-opt-${clinicId}`);
+  if (card) card.classList.add('selected');
+  window._selectorSelectedClinic = (window._selectorClinics || []).find(c => c.id === clinicId);
+  document.getElementById('selector-confirm-btn').disabled = false;
+}
+
+async function confirmClinicSelection() {
+  const clinic = window._selectorSelectedClinic;
+  if (!clinic) { showPortalToast('Please select a clinic.', 'error'); return; }
+
+  portalAccount.clinicId = clinic.id;
+  portalAccount.city = clinic.city;
+  portalClinic = clinic;
+  await DB.request('savePatientAccount', portalAccount);
+  sessionStorage.setItem('mediflow_patient_session', JSON.stringify(portalAccount));
+  showPortalToast('Clinic selected!', 'success');
+  setTimeout(() => portalShowDashboard(), 500);
+}
+
+// --- Patient Dashboard ---
+async function portalShowDashboard() {
+  if (!portalAccount) { portalShowAuth('signin'); return; }
+
+  // Load clinic info
+  if (!portalClinic && portalAccount.clinicId) {
+    const clinics = await DB.request('getClinics');
+    portalClinic = clinics.find(c => c.id === portalAccount.clinicId) || null;
+  }
+
+  showPortalView('view-patient-dashboard');
+
+  // Update profile bar
+  const initials = portalAccount.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  document.getElementById('patient-avatar-initials').textContent = initials;
+  document.getElementById('profile-display-name').textContent = portalAccount.name;
+  document.getElementById('profile-display-sub').textContent =
+    `📍 ${portalClinic ? portalClinic.name + ', ' + portalClinic.city : 'No clinic selected'} · 📱 ${portalAccount.phone}`;
+
+  switchPatientDashTab('apts');
+}
+
+function switchPatientDashTab(tab) {
+  ['apts','payments','rx'].forEach(t => {
+    document.getElementById(`pdash-panel-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`pdash-tab-${t}`).classList.toggle('active', t === tab);
+  });
+
+  if (tab === 'apts')     renderPatientAppointments();
+  if (tab === 'payments') renderPatientPayments();
+  if (tab === 'rx')       renderPatientPrescriptions();
+}
+
+async function renderPatientAppointments() {
+  const list = document.getElementById('patient-apts-list');
+  list.innerHTML = '<p style="color:var(--text-muted); padding:1rem;">Loading...</p>';
+
+  const all = await DB.request('getAppointmentsByPhone', { phone: portalAccount.phone });
+  const clinics = await DB.request('getClinics');
+
+  if (!all.length) {
+    list.innerHTML = emptyState('📅', 'No appointments yet', 'Book your first appointment using the button above.');
+    return;
+  }
+
+  const sorted = [...all].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  list.innerHTML = '';
+
+  sorted.forEach(apt => {
+    const clinic = clinics.find(c => c.id === apt.clinicId);
+    const d = new Date(apt.date + 'T00:00');
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const statusClass = apt.status === 'Pending Confirmation' ? 'pending'
+      : apt.status === 'Confirmed' ? 'confirmed'
+      : apt.status === 'Scheduled' ? 'scheduled'
+      : apt.status === 'Completed' ? 'completed'
+      : 'cancelled';
+
+    const ticketBtn = (apt.status === 'Confirmed' || apt.status === 'Completed')
+      ? `<button class="btn btn-secondary btn-sm" onclick="showAppointmentTicket('${apt.id}')">🎫 Ticket</button>` : '';
+
+    const payBtn = apt.paymentStatus === 'Pending' && (apt.status === 'Confirmed' || apt.status === 'Completed')
+      ? `<button class="btn btn-secondary btn-sm" style="border-color:#6366f1; color:#a5b4fc;" onclick="openUpiPayment('${apt.id}')">💳 Pay</button>` : '';
+
+    const item = document.createElement('div');
+    item.className = 'appointment-history-item';
+    item.innerHTML = `
+      <div class="apt-date-block">
+        <span class="adb-day">${dayNames[d.getDay()]}</span>
+        <span class="adb-num">${d.getDate()}</span>
+      </div>
+      <div class="apt-info">
+        <h4>${apt.doctorName} · ${apt.speciality || 'Consultation'}</h4>
+        <p>${clinic ? clinic.name : apt.clinicId} · ${apt.time} · ${apt.date}</p>
+        ${apt.reason ? `<p style="margin-top:0.2rem; font-style:italic;">"${apt.reason}"</p>` : ''}
+      </div>
+      <div class="apt-actions">
+        <span class="status-badge ${statusClass}">${apt.status}</span>
+        ${ticketBtn}
+        ${payBtn}
+      </div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+async function renderPatientPayments() {
+  const list = document.getElementById('patient-payments-list');
+  list.innerHTML = '<p style="color:var(--text-muted); padding:1rem;">Loading...</p>';
+
+  const bills = await DB.request('getBillsByPhone', { phone: portalAccount.phone });
+  const clinics = await DB.request('getClinics');
+
+  if (!bills.length) {
+    list.innerHTML = emptyState('💳', 'No payment records', 'Your billing history will appear here after appointments.');
+    return;
+  }
+
+  const sorted = [...bills].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  list.innerHTML = '';
+  sorted.forEach(bill => {
+    const clinic = clinics.find(c => c.id === bill.clinicId);
+    const isPaid = bill.paymentStatus === 'Paid';
+    const item = document.createElement('div');
+    item.className = 'appointment-history-item';
+    item.innerHTML = `
+      <div class="apt-date-block">
+        <span class="adb-day">${new Date(bill.createdAt).toLocaleDateString('en-IN',{month:'short'})}</span>
+        <span class="adb-num">${new Date(bill.createdAt).getDate()}</span>
+      </div>
+      <div class="apt-info">
+        <h4>${bill.id} · ${bill.doctorName}</h4>
+        <p>${clinic ? clinic.name : bill.clinicId} · ${bill.paymentMode || '—'}</p>
+      </div>
+      <div class="apt-actions">
+        <span style="font-family:var(--font-heading); font-size:1.1rem; font-weight:700;">₹${bill.total}</span>
+        <span class="status-badge ${isPaid ? 'paid' : 'pending'}">${bill.paymentStatus}</span>
+        ${!isPaid ? `<button class="btn btn-secondary btn-sm" style="border-color:#6366f1; color:#a5b4fc;" onclick="openUpiPaymentForBill('${bill.id}')">💳 Pay Now</button>` : ''}
+      </div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+async function renderPatientPrescriptions() {
+  const list = document.getElementById('patient-rx-list');
+  list.innerHTML = '<p style="color:var(--text-muted); padding:1rem;">Loading...</p>';
+
+  const all = await DB.request('getPrescriptions', {
+    clinicId: portalAccount.clinicId,
+    patientId: portalAccount.linkedPatientId || ''
+  });
+
+  // Also search by phone in appointments to find linked patient IDs
+  const apts = await DB.request('getAppointmentsByPhone', { phone: portalAccount.phone });
+  const patientIds = [...new Set(apts.map(a => a.patientId).filter(Boolean))];
+
+  const allRx = await DB.request('getPrescriptions', { clinicId: portalAccount.clinicId });
+  const myRx = allRx.filter(rx => patientIds.includes(rx.patientId));
+
+  if (!myRx.length) {
+    list.innerHTML = emptyState('📋', 'No prescriptions yet', 'Your digital prescriptions will appear here after your doctor appointments.');
+    return;
+  }
+
+  const sorted = [...myRx].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  list.innerHTML = '';
+  sorted.forEach(rx => {
+    const d = new Date(rx.createdAt);
+    const card = document.createElement('div');
+    card.className = 'prescription-record-card';
+    card.innerHTML = `
+      <div class="rx-header">
+        <h4>Dr. ${rx.doctorName || '—'}</h4>
+        <span class="rx-date-badge">${d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>
+      </div>
+      ${rx.chiefComplaints ? `<div class="rx-field"><div class="rf-label">Chief Complaint</div><div class="rf-value">${rx.chiefComplaints}</div></div>` : ''}
+      ${rx.findingsDiagnosis ? `<div class="rx-field"><div class="rf-label">Diagnosis</div><div class="rf-value">${rx.findingsDiagnosis}</div></div>` : ''}
+      ${rx.prescriptionBody ? `<div class="rx-field"><div class="rf-label">Medicines Prescribed</div><div class="rx-medicines-box">${rx.prescriptionBody}</div></div>` : ''}
+      <div style="margin-top:1rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+        <a class="btn-whatsapp" style="font-size:0.8rem; padding:0.4rem 1rem;"
+          href="${buildRxWhatsAppLink(rx)}" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Share via WhatsApp
+        </a>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function buildRxWhatsAppLink(rx) {
+  const text = encodeURIComponent(
+    `*MediFlow – My Prescription*\n\n` +
+    `*Doctor:* ${rx.doctorName || '—'}\n` +
+    `*Date:* ${new Date(rx.createdAt).toLocaleDateString('en-IN')}\n` +
+    `*Complaint:* ${rx.chiefComplaints || '—'}\n` +
+    `*Diagnosis:* ${rx.findingsDiagnosis || '—'}\n\n` +
+    `*Medicines:*\n${rx.prescriptionBody || '—'}`
+  );
+  return `https://wa.me/?text=${text}`;
+}
+
+// --- Profile Edit ---
+function openPatientProfileModal() {
+  if (!portalAccount) return;
+  document.getElementById('edit-profile-name').value    = portalAccount.name || '';
+  document.getElementById('edit-profile-age').value     = portalAccount.age  || '';
+  document.getElementById('edit-profile-gender').value  = portalAccount.gender || 'Male';
+  document.getElementById('edit-profile-address').value = portalAccount.address || '';
+  openModal('modal-patient-profile');
+}
+
+async function savePatientProfile() {
+  portalAccount.name    = document.getElementById('edit-profile-name').value.trim()    || portalAccount.name;
+  portalAccount.age     = document.getElementById('edit-profile-age').value            || portalAccount.age;
+  portalAccount.gender  = document.getElementById('edit-profile-gender').value         || portalAccount.gender;
+  portalAccount.address = document.getElementById('edit-profile-address').value.trim() || portalAccount.address;
+
+  await DB.request('savePatientAccount', portalAccount);
+  sessionStorage.setItem('mediflow_patient_session', JSON.stringify(portalAccount));
+  closeModal('modal-patient-profile');
+  showPortalToast('Profile updated!', 'success');
+  portalShowDashboard();
+}
+
+// =============================================================
+// BOOKING WIZARD
+// =============================================================
+
+async function portalStartBooking() {
+  if (!portalAccount) { portalShowAuth('signup'); return; }
+  if (!portalAccount.clinicId) { showClinicSelector(false); return; }
+
+  // Load clinic
+  if (!portalClinic) {
+    const clinics = await DB.request('getClinics');
+    portalClinic = clinics.find(c => c.id === portalAccount.clinicId);
+  }
+
+  // Reset state
+  bookingState = {
+    step: 1,
+    name: portalAccount.name, age: portalAccount.age || '',
+    gender: portalAccount.gender || '', phone: portalAccount.phone,
+    address: portalAccount.address || '', reason: '',
+    speciality: '', doctorUsername: '', doctorName: '',
+    date: '', time: '', currentDate: null
+  };
+
+  showPortalView('view-patient-booking');
+  renderBookingStep(1);
+}
+
+function renderBookingStep(step) {
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById(`booking-panel-${i}`).classList.toggle('hidden', i !== step);
+    const stepEl = document.getElementById(`bstep-${i}`);
+    stepEl.classList.remove('active', 'completed');
+    if (i === step) stepEl.classList.add('active');
+    if (i < step)  stepEl.classList.add('completed');
+    // Update step-dot checkmark for completed
+    stepEl.querySelector('.step-dot').textContent = i < step ? '✓' : i;
+  }
+
+  if (step === 1) prefillBookingStep1();
+  if (step === 2) renderSpecialityGrid();
+  if (step === 3) renderDoctorCards();
+  if (step === 4) renderSlotPicker();
+  if (step === 5) renderBookingSummary();
+}
+
+async function bookingNext(fromStep) {
+  if (fromStep === 1) {
+    const name   = document.getElementById('bk-name').value.trim();
+    const age    = document.getElementById('bk-age').value.trim();
+    const gender = document.getElementById('bk-gender').value;
+    const phone  = document.getElementById('bk-phone').value.trim();
+    if (!name || !age || !gender || !phone) {
+      showPortalToast('Please fill all required fields.', 'error'); return;
+    }
+    bookingState.name = name; bookingState.age = age;
+    bookingState.gender = gender; bookingState.phone = phone;
+    bookingState.address = document.getElementById('bk-address').value.trim();
+    bookingState.reason  = document.getElementById('bk-reason').value.trim();
+  }
+  if (fromStep === 2 && !bookingState.speciality) {
+    showPortalToast('Please choose a speciality.', 'error'); return;
+  }
+  if (fromStep === 3 && !bookingState.doctorUsername) {
+    showPortalToast('Please select a doctor.', 'error'); return;
+  }
+  if (fromStep === 4) {
+    if (!bookingState.date || !bookingState.time) {
+      showPortalToast('Please select a date and time slot.', 'error'); return;
+    }
+  }
+  bookingState.step = fromStep + 1;
+  renderBookingStep(bookingState.step);
+}
+
+function bookingBack(fromStep) {
+  bookingState.step = fromStep - 1;
+  renderBookingStep(bookingState.step);
+}
+
+function prefillBookingStep1() {
+  document.getElementById('bk-name').value   = bookingState.name   || '';
+  document.getElementById('bk-age').value    = bookingState.age    || '';
+  document.getElementById('bk-gender').value = bookingState.gender || '';
+  document.getElementById('bk-phone').value  = bookingState.phone  || '';
+  document.getElementById('bk-address').value= bookingState.address|| '';
+  document.getElementById('bk-reason').value = bookingState.reason || '';
+}
+
+async function renderSpecialityGrid() {
+  const grid = document.getElementById('speciality-grid');
+  grid.innerHTML = '';
+
+  // Load custom specialties and icons
+  if (portalAccount && portalAccount.clinicId) {
+    const specs = await DB.request('getSpecialities', { clinicId: portalAccount.clinicId });
+    specs.forEach(s => {
+      SPECIALITY_ICONS[s.name] = s.icon;
+    });
+  }
+
+  const users = await DB.request('getUsers');
+  const doctors = users.filter(u => u.role === 'doctor' && u.clinicId === portalAccount.clinicId);
+  const specialities = [...new Set(doctors.map(d => d.speciality).filter(Boolean))];
+
+  if (!specialities.length) {
+    let debugInfo = '';
+    if (!portalAccount) {
+      debugInfo = ' (Error: No logged-in account found)';
+    } else if (!portalAccount.clinicId) {
+      debugInfo = ' (Error: No clinic selected for this account)';
+    } else if (!users || users.length === 0) {
+      debugInfo = ' (Error: Database users list is empty)';
+    } else {
+      const activeClinicDoctors = users.filter(u => u.role === 'doctor' && u.clinicId === portalAccount.clinicId);
+      if (activeClinicDoctors.length === 0) {
+        debugInfo = ` (Error: No doctors found in database for clinic "${portalAccount.clinicId}")`;
+      } else {
+        debugInfo = ` (Error: Doctors found in clinic "${portalAccount.clinicId}", but none have specialities set)`;
+      }
+    }
+    grid.innerHTML = `<p style="color:var(--text-muted);">No specialities configured for this clinic yet. Ask the clinic admin to set doctor specialities.${debugInfo}</p>`;
+    return;
+  }
+
+  specialities.forEach(sp => {
+    const card = document.createElement('div');
+    card.className = 'speciality-card' + (bookingState.speciality === sp ? ' selected' : '');
+    card.onclick = () => {
+      bookingState.speciality = sp;
+      bookingState.doctorUsername = '';
+      bookingState.doctorName = '';
+      document.querySelectorAll('.speciality-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      setTimeout(() => {
+        bookingNext(2);
+      }, 300);
+    };
+    card.innerHTML = `
+      <div class="sp-icon">${SPECIALITY_ICONS[sp] || '🏥'}</div>
+      <div class="sp-name">${sp}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+async function renderDoctorCards() {
+  const list = document.getElementById('doctor-cards-list');
+  list.innerHTML = '<p style="color:var(--text-muted);">Loading doctors...</p>';
+
+  const users = await DB.request('getUsers');
+  const doctors = users.filter(u =>
+    u.role === 'doctor' &&
+    u.clinicId === portalAccount.clinicId &&
+    u.speciality === bookingState.speciality
+  );
+
+  if (!doctors.length) {
+    list.innerHTML = '<p style="color:var(--text-muted);">No doctors found for this speciality.</p>';
+    return;
+  }
+
+  list.innerHTML = '';
+  doctors.forEach(doc => {
+    const card = document.createElement('div');
+    card.className = 'doctor-select-card' + (bookingState.doctorUsername === doc.username ? ' selected' : '');
+    card.onclick = () => {
+      bookingState.doctorUsername = doc.username;
+      bookingState.doctorName = doc.name;
+      document.querySelectorAll('.doctor-select-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      setTimeout(() => {
+        bookingNext(3);
+      }, 300);
+    };
+    card.innerHTML = `
+      <div class="doctor-avatar">👨‍⚕️</div>
+      <div class="doc-info">
+        <h4>${doc.name}</h4>
+        <p>${doc.qualification || ''} · ${doc.designation || ''}</p>
+      </div>
+      <div class="doc-next-slot">Available →</div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+async function renderSlotPicker() {
+  const strip = document.getElementById('slot-date-strip');
+  const container = document.getElementById('slot-sessions-container');
+  strip.innerHTML = '';
+  container.innerHTML = '';
+
+  // Build 7-day date strip
+  const today = new Date();
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    dates.push(d);
+  }
+
+  if (!bookingState.currentDate) {
+    bookingState.currentDate = dates[0];
+    bookingState.date = formatDate(dates[0]);
+  }
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  dates.forEach(d => {
+    const btn = document.createElement('div');
+    btn.className = 'slot-date-btn' + (formatDate(d) === bookingState.date ? ' active' : '');
+    btn.innerHTML = `<span class="date-day">${dayNames[d.getDay()]}</span><span class="date-num">${d.getDate()}</span>`;
+    btn.onclick = () => {
+      bookingState.currentDate = d;
+      bookingState.date = formatDate(d);
+      bookingState.time = '';
+      document.querySelectorAll('.slot-date-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderSessionSlots();
+    };
+    strip.appendChild(btn);
+  });
+
+  await renderSessionSlots();
+}
+
+async function renderSessionSlots() {
+  const container = document.getElementById('slot-sessions-container');
+  container.innerHTML = '';
+
+  const slotConfig = await DB.request('getDoctorSlotConfig', {
+    doctorUsername: bookingState.doctorUsername,
+    clinicId: portalAccount.clinicId
+  });
+
+  if (!slotConfig || !slotConfig.sessions || !slotConfig.sessions.length) {
+    container.innerHTML = '<p style="color:var(--text-muted); padding:0.5rem 0;">No slots configured for this doctor. Please contact the clinic.</p>';
+    return;
+  }
+
+  // Check workday
+  const d = bookingState.currentDate || new Date();
+  const dayShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  if (!slotConfig.workDays.includes(dayShort)) {
+    container.innerHTML = `<p style="color:var(--text-muted); padding:0.5rem 0;">Doctor is not available on ${dayShort}s.</p>`;
+    return;
+  }
+
+  // Get existing booked slots for this doctor on this date
+  const allApts = await DB.request('getAppointments', { clinicId: portalAccount.clinicId });
+  const bookedSlots = allApts
+    .filter(a => a.doctorUsername === bookingState.doctorUsername && a.date === bookingState.date && a.status !== 'Cancelled')
+    .map(a => a.time);
+
+  slotConfig.sessions.forEach(session => {
+    const labelEl = document.createElement('div');
+    labelEl.className = 'slot-session-label';
+    labelEl.textContent = session.label;
+    container.appendChild(labelEl);
+
+    const slotsDiv = document.createElement('div');
+    slotsDiv.className = 'slots-grid';
+
+    const slots = generateTimeSlots(session.start, session.end, slotConfig.slotDuration || 30);
+    slots.forEach(slot => {
+      const isBooked   = bookedSlots.includes(slot);
+      const isSelected = bookingState.time === slot;
+      const btn = document.createElement('button');
+      btn.className = `slot-btn ${isBooked ? 'booked' : isSelected ? 'selected' : 'free'}`;
+      btn.textContent = slot;
+      btn.disabled = isBooked;
+      btn.onclick = () => {
+        if (isBooked) {
+          showPortalToast('⛔ This slot is already booked. Please choose another time.', 'warning');
+          return;
+        }
+        bookingState.time = slot;
+        document.querySelectorAll('.slot-btn').forEach(b => {
+          b.className = `slot-btn ${bookedSlots.includes(b.textContent) ? 'booked' : 'free'}`;
+        });
+        btn.className = 'slot-btn selected';
+        setTimeout(() => {
+          bookingNext(4);
+        }, 300);
+      };
+      slotsDiv.appendChild(btn);
+    });
+
+    container.appendChild(slotsDiv);
+  });
+}
+
+function generateTimeSlots(start, end, durationMins) {
+  const slots = [];
+  let [h, m] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  while (h * 60 + m < eh * 60 + em) {
+    const period = h < 12 ? 'AM' : 'PM';
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    const mm = m.toString().padStart(2, '0');
+    slots.push(`${hh}:${mm} ${period}`);
+    m += durationMins;
+    if (m >= 60) { h += Math.floor(m / 60); m = m % 60; }
+  }
+  return slots;
+}
+
+function renderBookingSummary() {
+  const grid = document.getElementById('booking-summary-grid');
+  grid.innerHTML = `
+    <div class="summary-item"><span class="s-label">Patient Name</span><span class="s-value">${bookingState.name}</span></div>
+    <div class="summary-item"><span class="s-label">Age / Gender</span><span class="s-value">${bookingState.age} yrs / ${bookingState.gender}</span></div>
+    <div class="summary-item"><span class="s-label">Mobile</span><span class="s-value">${bookingState.phone}</span></div>
+    <div class="summary-item"><span class="s-label">Clinic</span><span class="s-value">${portalClinic ? portalClinic.name : '—'}</span></div>
+    <div class="summary-item"><span class="s-label">Speciality</span><span class="s-value">${bookingState.speciality}</span></div>
+    <div class="summary-item"><span class="s-label">Doctor</span><span class="s-value">${bookingState.doctorName}</span></div>
+    <div class="summary-item"><span class="s-label">Date</span><span class="s-value">${bookingState.date}</span></div>
+    <div class="summary-item"><span class="s-label">Time</span><span class="s-value">${bookingState.time}</span></div>
+    ${bookingState.reason ? `<div class="summary-item" style="grid-column:span 2;"><span class="s-label">Reason for Visit</span><span class="s-value">${bookingState.reason}</span></div>` : ''}
+  `;
+  document.getElementById('booking-review-content').classList.remove('hidden');
+  document.getElementById('booking-confirmed-panel').classList.add('hidden');
+  document.getElementById('booking-submit-panel').classList.remove('hidden');
+}
+
+async function submitBooking() {
+  const btn = document.getElementById('confirm-booking-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  // Double-check slot availability
+  const allApts = await DB.request('getAppointments', { clinicId: portalAccount.clinicId });
+  const conflict = allApts.find(a =>
+    a.doctorUsername === bookingState.doctorUsername &&
+    a.date === bookingState.date &&
+    a.time === bookingState.time &&
+    a.status !== 'Cancelled'
+  );
+
+  if (conflict) {
+    showPortalToast('⛔ This slot was just booked by someone else! Please pick another time.', 'error');
+    btn.disabled = false; btn.textContent = '✅ Confirm Booking';
+    bookingBack(5);
+    return;
+  }
+
+  // Ensure patient profile is registered in the clinic's demographics database
+  try {
+    const patients = await DB.request('getPatients', { clinicId: portalAccount.clinicId });
+    const patientExists = patients.some(p => p.id === portalAccount.id || p.mobile === bookingState.phone);
+    if (!patientExists) {
+      const newPatient = {
+        id: portalAccount.id,
+        clinicId: portalAccount.clinicId,
+        name: bookingState.name,
+        age: parseInt(bookingState.age) || 0,
+        gender: bookingState.gender,
+        mobile: bookingState.phone,
+        address: bookingState.address || '',
+        registeredAt: new Date().toISOString().split('T')[0]
+      };
+      await DB.request('savePatient', newPatient);
+    }
+  } catch (err) {
+    console.error('Error saving patient to demographics:', err);
+  }
+
+  const aptId = `APT-${Date.now()}`;
+  const appointment = {
+    id: aptId,
+    clinicId: portalAccount.clinicId,
+    patientId: portalAccount.id,
+    patientName: bookingState.name,
+    patientPhone: bookingState.phone,
+    patientAge: bookingState.age,
+    patientGender: bookingState.gender,
+    patientAddress: bookingState.address,
+    reason: bookingState.reason,
+    doctorUsername: bookingState.doctorUsername,
+    doctorName: bookingState.doctorName,
+    speciality: bookingState.speciality,
+    date: bookingState.date,
+    time: bookingState.time,
+    type: 'Consultation',
+    status: 'Pending Confirmation',
+    paymentStatus: 'Pending',
+    createdBy: 'patient-portal',
+    createdAt: new Date().toISOString()
+  };
+
+  await DB.request('saveAppointment', appointment);
+
+  // Update patient profile with details
+  portalAccount.age     = bookingState.age;
+  portalAccount.gender  = bookingState.gender;
+  portalAccount.address = bookingState.address;
+  await DB.request('savePatientAccount', portalAccount);
+  sessionStorage.setItem('mediflow_patient_session', JSON.stringify(portalAccount));
+
+  document.getElementById('booking-review-content').classList.add('hidden');
+  document.getElementById('booking-submit-panel').classList.add('hidden');
+  document.getElementById('booking-confirmed-panel').classList.remove('hidden');
+  showPortalToast('Booking submitted!', 'success');
+
+  // Refresh cadmin appointment panels if they're visible
+  if (typeof renderCadminAppointments === 'function') {
+    try { renderCadminAppointments(); } catch(e) {}
+  }
+}
+
+// =============================================================
+// TICKET & PAYMENT
+// =============================================================
+
+async function showAppointmentTicket(aptId) {
+  let allApts = [];
+  if (portalAccount) {
+    allApts = await DB.request('getAppointmentsByPhone', { phone: portalAccount.phone });
+  } else if (currentUser && currentUser.clinicId) {
+    allApts = await DB.request('getAppointments', { clinicId: currentUser.clinicId });
+  } else {
+    allApts = JSON.parse(localStorage.getItem('mediflow_appointments') || '[]');
+  }
+  const apt = allApts.find(a => a.id === aptId);
+  if (!apt) return;
+
+  const clinics = await DB.request('getClinics');
+  const clinic = clinics.find(c => c.id === apt.clinicId);
+
+  document.getElementById('ticket-apt-id').textContent      = apt.id;
+  document.getElementById('ticket-patient-name').textContent= apt.patientName;
+  document.getElementById('ticket-datetime').textContent    = `${apt.date} · ${apt.time}`;
+  document.getElementById('ticket-doctor').textContent      = apt.doctorName;
+  document.getElementById('ticket-speciality').textContent  = apt.speciality || '—';
+  document.getElementById('ticket-clinic').textContent      = clinic ? `${clinic.name}, ${clinic.city}` : apt.clinicId;
+  document.getElementById('ticket-payment').textContent     = apt.paymentMode || (apt.paymentStatus === 'Pending' ? 'Pending' : 'Paid');
+
+  // Build WhatsApp deep link
+  const waText = encodeURIComponent(
+    `🏥 *MediFlow Appointment Ticket*\n\n` +
+    `*Booking ID:* ${apt.id}\n` +
+    `*Patient:* ${apt.patientName}\n` +
+    `*Doctor:* ${apt.doctorName} (${apt.speciality || 'Consultation'})\n` +
+    `*Clinic:* ${clinic ? clinic.name + ', ' + clinic.city : apt.clinicId}\n` +
+    `*Date & Time:* ${apt.date} at ${apt.time}\n` +
+    `*Status:* ✅ Confirmed\n\n` +
+    `Please arrive 10 minutes early. Thank you!`
+  );
+  document.getElementById('ticket-whatsapp-btn').href = `https://wa.me/?text=${waText}`;
+
+  openModal('modal-apt-ticket');
+}
+
+async function openUpiPayment(aptId) {
+  let allApts = [];
+  if (portalAccount) {
+    allApts = await DB.request('getAppointmentsByPhone', { phone: portalAccount.phone });
+  } else if (currentUser && currentUser.clinicId) {
+    allApts = await DB.request('getAppointments', { clinicId: currentUser.clinicId });
+  } else {
+    allApts = JSON.parse(localStorage.getItem('mediflow_appointments') || '[]');
+  }
+  const apt = allApts.find(a => a.id === aptId);
+  if (!apt) return;
+
+  const clinics = await DB.request('getClinics');
+  const clinic  = clinics.find(c => c.id === apt.clinicId);
+  const amount  = clinic ? (clinic.consultationFee || 400) : 400;
+  const upiId   = clinic ? (clinic.upiId || 'mediflow@upi') : 'mediflow@upi';
+
+  currentUpiAppointmentId = aptId;
+  await renderUpiQr(upiId, amount, apt.patientName, apt.id);
+  openModal('modal-upi-payment');
+}
+
+async function openUpiPaymentForBill(billId) {
+  let allBills = [];
+  if (portalAccount) {
+    allBills = await DB.request('getBillsByPhone', { phone: portalAccount.phone });
+  } else if (currentUser && currentUser.clinicId) {
+    allBills = await DB.request('getBills', { clinicId: currentUser.clinicId });
+  } else {
+    allBills = JSON.parse(localStorage.getItem('mediflow_bills') || '[]');
+  }
+  const bill = allBills.find(b => b.id === billId);
+  if (!bill) return;
+
+  const clinics = await DB.request('getClinics');
+  const clinic  = clinics.find(c => c.id === bill.clinicId);
+  const upiId   = clinic ? (clinic.upiId || 'mediflow@upi') : 'mediflow@upi';
+
+  currentUpiAppointmentId = billId; // reuse for bill
+  await renderUpiQr(upiId, bill.total, bill.patientName, bill.id);
+  openModal('modal-upi-payment');
+}
+
+async function renderUpiQr(upiId, amount, patientName, refId) {
+  document.getElementById('upi-payment-amount').textContent = `₹${amount}`;
+  document.getElementById('upi-id-display').textContent = upiId;
+
+  const upiUri = `upi://pay?pa=${upiId}&pn=MediFlow&am=${amount}&cu=INR&tn=${refId}`;
+  const canvas = document.getElementById('upi-qr-canvas');
+
+  if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+    try {
+      await QRCode.toCanvas(canvas, upiUri, { width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' } });
+    } catch(e) {
+      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      console.warn('QR generation error:', e);
+    }
+  }
+}
+
+async function confirmUpiPayment() {
+  if (!currentUpiAppointmentId) return;
+  const txnRef = document.getElementById('upi-txn-ref').value.trim();
+
+  // Try updating as appointment first, then bill
+  let allApts = [];
+  if (portalAccount) {
+    allApts = await DB.request('getAppointmentsByPhone', { phone: portalAccount.phone });
+  } else if (currentUser && currentUser.clinicId) {
+    allApts = await DB.request('getAppointments', { clinicId: currentUser.clinicId });
+  } else {
+    allApts = JSON.parse(localStorage.getItem('mediflow_appointments') || '[]');
+  }
+  const apt = allApts.find(a => a.id === currentUpiAppointmentId);
+  if (apt) {
+    apt.paymentStatus = 'Paid';
+    apt.paymentMode   = 'UPI';
+    apt.upiTxnRef     = txnRef || '—';
+    await DB.request('saveAppointment', apt);
+  }
+
+  let allBills = [];
+  if (portalAccount) {
+    allBills = await DB.request('getBillsByPhone', { phone: portalAccount.phone });
+  } else if (currentUser && currentUser.clinicId) {
+    allBills = await DB.request('getBills', { clinicId: currentUser.clinicId });
+  } else {
+    allBills = JSON.parse(localStorage.getItem('mediflow_bills') || '[]');
+  }
+  const bill = allBills.find(b => b.id === currentUpiAppointmentId);
+  if (bill) {
+    bill.paymentStatus = 'Paid';
+    bill.paymentMode   = 'UPI';
+    bill.amountPaid    = bill.total;
+    await DB.request('saveBill', bill);
+  }
+
+  closeModal('modal-upi-payment');
+  showPortalToast('✅ Payment recorded! Thank you.', 'success');
+  currentUpiAppointmentId = null;
+  document.getElementById('upi-txn-ref').value = '';
+
+  // Refresh patient dashboard
+  if (document.getElementById('pdash-tab-payments').classList.contains('active')) {
+    renderPatientPayments();
+  } else if (document.getElementById('pdash-tab-apts').classList.contains('active')) {
+    renderPatientAppointments();
+  }
+}
+
+// =============================================================
+// STAFF / CADMIN — Confirm Pending Appointments
+// =============================================================
+
+// Patch into cadmin appointments render — add Confirm button for Pending Confirmation status
+const _origRenderCadminAppointments = typeof renderCadminAppointments !== 'undefined' ? renderCadminAppointments : null;
+
+window.confirmPatientAppointment = async function(aptId) {
+  const clinicId = currentUser ? currentUser.clinicId : (portalAccount ? portalAccount.clinicId : null);
+  if (!clinicId) return;
+  const allApts = await DB.request('getAppointments', { clinicId });
+  const apt = allApts.find(a => a.id === aptId);
+  if (!apt) return;
+  apt.status = 'Confirmed';
+  await DB.request('saveAppointment', apt);
+  showPortalToast('Appointment confirmed!', 'success');
+  if (typeof renderCadminAppointments === 'function') renderCadminAppointments();
+  if (typeof loadAppointments === 'function') loadAppointments();
+};
+
+// =============================================================
+// UTILITIES
+// =============================================================
+
+function formatDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function showPortalToast(msg, type = 'success') {
+  const toast = document.getElementById('portal-toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.className = `portal-toast ${type} show`;
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+function emptyState(icon, title, desc) {
+  return `<div class="empty-state">
+    <div class="es-icon">${icon}</div>
+    <h4>${title}</h4>
+    <p>${desc}</p>
+  </div>`;
+}
+
+function openTutorialModal(role) {
+  const modalTitle = document.getElementById('tutorial-modal-title');
+  const modalBody = document.getElementById('tutorial-modal-body');
+  if (!modalTitle || !modalBody) return;
+
+  let title = 'Help & Tutorial Guide';
+  let content = '';
+
+  if (role === 'patient') {
+    title = '❓ Patient Portal: How to Book Appointments';
+    content = `
+      <div class="tutorial-steps">
+        <div class="tutorial-step">
+          <h4>1. Personal & Intake Details</h4>
+          <p>Confirm or enter your demographics (name, age, gender, phone) and outline the reason for your medical visit.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>2. Pick Medical Specialty</h4>
+          <p>Choose the relevant medical department (General Medicine, ENT, Dental, Dermatology, etc.) based on your symptoms.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>3. Select Practitioner</h4>
+          <p>Select your treating physician from the list of doctors registered at the clinic.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>4. Reserve Time Slot</h4>
+          <p>Choose your preferred appointment slot in the calendar. Free slots are highlighted in green, while booked slots are red.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>5. Receive Whatsapp Ticket</h4>
+          <p>Confirm the booking. Once checked by reception, complete payment and click "Share via WhatsApp" to get your digital ticket!</p>
+        </div>
+      </div>
+    `;
+  } else if (role === 'clinic_admin') {
+    title = '🏥 Clinic Admin: Facility Configuration Guide';
+    content = `
+      <div class="tutorial-steps">
+        <div class="tutorial-step">
+          <h4>1. Manage Facility Users</h4>
+          <p>Create, update, and manage accounts for clinic staff (nurses, receptionists) and doctors under the <strong>Users & Settings</strong> tab.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>2. Netlify Blobs Logo Integration</h4>
+          <p>Upload your official clinic letterhead logo. It is securely saved in Netlify Blobs and printed automatically on prescriptions.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>3. Doctor Calendars & Shift Rosters</h4>
+          <p>Define doctors' availability slots, working days, and coordinate the clinic's weekly duty shifts and emergency logs.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>4. Revenue & Financial Reports</h4>
+          <p>Review real-time financial metrics, check cash/UPI payment distributions, and monitor invoice dues and billing performance.</p>
+        </div>
+      </div>
+    `;
+  } else if (role === 'staff') {
+    title = '📋 Clinic Staff: Reception & Billing Operations';
+    content = `
+      <div class="tutorial-steps">
+        <div class="tutorial-step">
+          <h4>1. Patient Intake Queue</h4>
+          <p>Register new patients or search existing profiles in the reception desk queue to start their intake.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>2. Record Nurse Vitals</h4>
+          <p>Collect and save vital measurements (Height, Weight, BP, Pulse, SpO2) before assigning them to the doctor's consultation queue.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>3. Schedule Appointments</h4>
+          <p>Book walk-in appointments, verify patient-portal requests, and manage Checked In / Checked Out statuses.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>4. Billing & Insurance Desk</h4>
+          <p>Generate invoices, configure line items, record UPI/Cash collections, and file insurance co-pay claims.</p>
+        </div>
+      </div>
+    `;
+  } else if (role === 'doctor') {
+    title = '🩺 Doctor Cockpit: Prescription & Queue Workflow';
+    content = `
+      <div class="tutorial-steps">
+        <div class="tutorial-step">
+          <h4>1. Patient Queue & Vitals Inspection</h4>
+          <p>Select a patient from the registry to view their demographics and recorded intake vitals in real time.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>2. Pre-configured Templates</h4>
+          <p>Use the specialty dropdown and templates library to instantly pre-fill complaints, signs, and prescription plans.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>3. Compose Prescription Proper</h4>
+          <p>Draft diagnostic lab orders and advice instructions, and select/type medications in the Rx Canvas proper.</p>
+        </div>
+        <div class="tutorial-step">
+          <h4>4. Plain Paper Print Presets</h4>
+          <p>Toggle "Plain Paper" to automatically overlay the Netlify Blobs logo header, and click "Print" to print a clean A4 prescription.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  modalTitle.textContent = title;
+  modalBody.innerHTML = content;
+  openModal('modal-tutorial');
+}
+
+// Expose to global scope for HTML onclick handlers
+window.portalGoLanding        = portalGoLanding;
+window.portalShowAuth         = portalShowAuth;
+window.portalShowDashboard    = portalShowDashboard;
+window.portalStartBooking     = portalStartBooking;
+window.portalLogout           = portalLogout;
+window.switchAuthTab          = switchAuthTab;
+window.handlePatientSignup    = handlePatientSignup;
+window.handlePatientSignin    = handlePatientSignin;
+window.showClinicSelector     = showClinicSelector;
+window.onCitySelectorChange   = onCitySelectorChange;
+window.selectClinicOption     = selectClinicOption;
+window.confirmClinicSelection = confirmClinicSelection;
+window.bookingNext            = bookingNext;
+window.bookingBack            = bookingBack;
+window.submitBooking          = submitBooking;
+window.switchPatientDashTab   = switchPatientDashTab;
+window.openPatientProfileModal= openPatientProfileModal;
+window.savePatientProfile     = savePatientProfile;
+window.showAppointmentTicket  = showAppointmentTicket;
+window.openUpiPayment         = openUpiPayment;
+window.openUpiPaymentForBill  = openUpiPaymentForBill;
+window.confirmUpiPayment      = confirmUpiPayment;
+window.showClinicLogin        = showClinicLogin;
+window.confirmClinicAdminLogin = confirmClinicAdminLogin;
+window.openTutorialModal      = openTutorialModal;
+
+// --- PROFILE SETTINGS MODULE ---
+function openProfileSettingsModal() {
+  document.getElementById('profile-settings-form').reset();
+  const errorDiv = document.getElementById('settings-error');
+  if (errorDiv) errorDiv.classList.add('hidden');
+
+  const idGroup = document.getElementById('settings-id-group');
+  if (idGroup) {
+    if (currentUser && currentUser.role === 'admin') {
+      idGroup.classList.remove('hidden');
+      document.getElementById('settings-username').value = currentUser.username;
+      document.getElementById('settings-username').required = true;
+    } else {
+      idGroup.classList.add('hidden');
+      document.getElementById('settings-username').required = false;
+    }
+  }
+
+  openModal('modal-profile-settings');
+}
+
+async function handleProfileSettingsSubmit(e) {
+  e.preventDefault();
+  
+  const currentPasswordInput = document.getElementById('settings-current-password').value;
+  const newPasswordInput = document.getElementById('settings-new-password').value;
+  const confirmPasswordInput = document.getElementById('settings-confirm-password').value;
+  const errorDiv = document.getElementById('settings-error');
+  
+  if (newPasswordInput !== confirmPasswordInput) {
+    errorDiv.textContent = "New passwords do not match!";
+    errorDiv.classList.remove('hidden');
+    return;
+  }
+
+  if (currentUser) {
+    if (currentUser.password !== currentPasswordInput) {
+      errorDiv.textContent = "Current password is incorrect!";
+      errorDiv.classList.remove('hidden');
+      return;
+    }
+
+    if (currentUser.role === 'admin') {
+      const newUsername = document.getElementById('settings-username').value.trim();
+      if (!newUsername) {
+        errorDiv.textContent = "Username cannot be empty!";
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      
+      const oldUsername = currentUser.username;
+      const users = await DB.request('getUsers');
+      
+      if (newUsername.toLowerCase() !== oldUsername.toLowerCase()) {
+        const usernameTaken = users.some(u => u.username.toLowerCase() === newUsername.toLowerCase());
+        if (usernameTaken) {
+          errorDiv.textContent = "That username/ID is already taken!";
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+      }
+
+      currentUser.username = newUsername;
+      currentUser.password = newPasswordInput;
+
+      if (newUsername !== oldUsername) {
+        await DB.request('deleteUser', { username: oldUsername });
+      }
+      await DB.request('saveUser', currentUser);
+      sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
+      
+      // Update nav username
+      document.getElementById('nav-user-name').textContent = `${currentUser.name} (Super Admin)`;
+    } else {
+      currentUser.password = newPasswordInput;
+      await DB.request('saveUser', currentUser);
+      sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
+    }
+
+    closeModal('modal-profile-settings');
+    alert("Settings updated successfully!");
+  } else if (portalAccount) {
+    if (portalAccount.password !== currentPasswordInput) {
+      errorDiv.textContent = "Current password is incorrect!";
+      errorDiv.classList.remove('hidden');
+      return;
+    }
+
+    portalAccount.password = newPasswordInput;
+    await DB.request('savePatientAccount', portalAccount);
+    sessionStorage.setItem('mediflow_patient_session', JSON.stringify(portalAccount));
+
+    closeModal('modal-profile-settings');
+    showPortalToast("Password updated successfully!", "success");
+  } else {
+    closeModal('modal-profile-settings');
+    alert("Error: No active session detected.");
+  }
+}
+
+// Expose new window methods
+window.openProfileSettingsModal = openProfileSettingsModal;
+window.handleProfileSettingsSubmit = handleProfileSettingsSubmit;
+window.openAddSpecialityModal = openAddSpecialityModal;
+window.openEditSpecialityModal = openEditSpecialityModal;
+window.handleSpecialitySubmit = handleSpecialitySubmit;
+window.deleteCadminSpeciality = deleteCadminSpeciality;
+window.openCategoriesModal = openCategoriesModal;
+window.handleCategoryAdd = handleCategoryAdd;
+window.editDrugCategory = editDrugCategory;
+window.deleteDrugCategory = deleteDrugCategory;
 

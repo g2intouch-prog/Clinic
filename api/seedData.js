@@ -10,7 +10,7 @@ const INITIAL_CLINICS = [
     upiId: 'aarogyam@upi',
     consultationFee: 400,
     billingModel: 'Subscription',
-    rate: 5000, // ₹5000 / month
+    rate: 5000,
     payments: [
       { invoiceDate: '2026-03-01', amountDue: 5000, amountPaid: 5000, status: 'Paid', paymentDate: '2026-03-03' },
       { invoiceDate: '2026-04-01', amountDue: 5000, amountPaid: 5000, status: 'Paid', paymentDate: '2026-04-02' },
@@ -28,7 +28,7 @@ const INITIAL_CLINICS = [
     upiId: 'dantaseva@upi',
     consultationFee: 500,
     billingModel: 'PerPatient',
-    rate: 20, // ₹20 / patient entry
+    rate: 20,
     payments: [
       { invoiceDate: '2026-03-01', patientCount: 45, amountDue: 900, amountPaid: 900, status: 'Paid', paymentDate: '2026-03-05' },
       { invoiceDate: '2026-04-01', patientCount: 52, amountDue: 1040, amountPaid: 1040, status: 'Paid', paymentDate: '2026-04-04' },
@@ -38,16 +38,11 @@ const INITIAL_CLINICS = [
 ];
 
 const INITIAL_USERS = [
-  // Super Admin
   { username: 'admin', password: 'password', role: 'admin', clinicId: null, name: 'Super Administrator' },
-  // Clinic 1 Admin
   { username: 'cadmin1', password: 'password', role: 'clinic_admin', clinicId: 'clinic-1', name: 'Aarav Sharma (Manager)', status: 'Active' },
-  // Clinic 2 Admin
   { username: 'cadmin2', password: 'password', role: 'clinic_admin', clinicId: 'clinic-2', name: 'Priya Patel (Manager)', status: 'Active' },
-  // Clinic 1 Staff
   { username: 'staff1', password: 'password', role: 'staff', clinicId: 'clinic-1', name: 'Nurse Sunita Nair', permissions: ['reception', 'finance'] },
   { username: 'staff2', password: 'password', role: 'staff', clinicId: 'clinic-1', name: 'Amit Patel', permissions: ['reception'] },
-  // Clinic 1 Doctors
   { 
     username: 'doctor1', 
     password: 'password', 
@@ -68,7 +63,6 @@ const INITIAL_USERS = [
     designation: 'ENT Specialist',
     speciality: 'ENT'
   },
-  // Clinic 2 Doctor
   { 
     username: 'doctor3', 
     password: 'password', 
@@ -117,9 +111,7 @@ const INITIAL_VITALS = [
   }
 ];
 
-// Doctor configurations (isolated by doctorUsername)
 const INITIAL_TEMPLATES = [
-  // Dr. Rajesh Iyer (doctor1)
   {
     id: 't1',
     doctorUsername: 'doctor1',
@@ -162,8 +154,6 @@ const INITIAL_TEMPLATES = [
     findingsDiagnosis: 'Atopic Dermatitis (Eczema)',
     prescriptionBody: 'CRM. Mometasone Furoate 0.1% -- Apply thin layer twice daily to affected areas -- 10 days\nTab. Cetirizine 10mg -- 1 tab daily at bedtime -- 15 days\nEmollient Moisturizer -- Apply liberally 3-4 times daily -- Ongoing'
   },
-  
-  // Dr. Amit Verma (doctor2)
   {
     id: 't4',
     doctorUsername: 'doctor2',
@@ -195,7 +185,6 @@ const INITIAL_TEMPLATES = [
 ];
 
 const INITIAL_DRUGS = [
-  // doctor1 (General / Derma)
   { id: 'd1', doctorUsername: 'doctor1', clinicId: 'clinic-1', name: 'Paracetamol 650mg', category: 'NSAIDs/Analgesics' },
   { id: 'd2', doctorUsername: 'doctor1', clinicId: 'clinic-1', name: 'Ibuprofen 400mg', category: 'NSAIDs/Analgesics' },
   { id: 'd3', doctorUsername: 'doctor1', clinicId: 'clinic-1', name: 'Amoxicillin 500mg', category: 'Antibiotics' },
@@ -205,8 +194,6 @@ const INITIAL_DRUGS = [
   { id: 'd7', doctorUsername: 'doctor1', clinicId: 'clinic-1', name: 'Telmisartan 40mg', category: 'General' },
   { id: 'd8', doctorUsername: 'doctor1', clinicId: 'clinic-1', name: 'Hydrocortisone 1% Cream', category: 'Derma' },
   { id: 'd9', doctorUsername: 'doctor1', clinicId: 'clinic-1', name: 'Mometasone Furoate 0.1% Cream', category: 'Derma' },
-
-  // doctor2 (ENT)
   { id: 'd10', doctorUsername: 'doctor2', clinicId: 'clinic-1', name: 'Amoxicillin-Clavulanate 625mg', category: 'Antibiotics' },
   { id: 'd11', doctorUsername: 'doctor2', clinicId: 'clinic-1', name: 'Ofloxacin Ear Drops', category: 'General' },
   { id: 'd12', doctorUsername: 'doctor2', clinicId: 'clinic-1', name: 'Fluticasone Furoate Nasal Spray', category: 'General' },
@@ -215,15 +202,12 @@ const INITIAL_DRUGS = [
 ];
 
 const INITIAL_TESTS = [
-  // doctor1
   { id: 'ts1', doctorUsername: 'doctor1', name: 'Complete Blood Count (CBC)' },
   { id: 'ts2', doctorUsername: 'doctor1', name: 'Widal Agglutination Test' },
   { id: 'ts3', doctorUsername: 'doctor1', name: 'Dengue NS1 Antigen (ELISA)' },
   { id: 'ts4', doctorUsername: 'doctor1', name: 'HbA1c & Fasting Blood Sugar' },
   { id: 'ts5', doctorUsername: 'doctor1', name: 'Lipid Profile Panel' },
   { id: 'ts6', doctorUsername: 'doctor1', name: 'Serum Creatinine & Blood Urea' },
-  
-  // doctor2
   { id: 'ts7', doctorUsername: 'doctor2', name: 'Absolute Eosinophil Count (AEC)' },
   { id: 'ts8', doctorUsername: 'doctor2', name: 'Total Serum IgE' },
   { id: 'ts9', doctorUsername: 'doctor2', name: 'CT Scan Paranasal Sinuses (PNS)' },
@@ -231,28 +215,14 @@ const INITIAL_TESTS = [
 ];
 
 const INITIAL_ADVICE = [
-  // doctor1
   { id: 'a1', doctorUsername: 'doctor1', name: 'Fever Care', text: 'Drink warm fluids (herbal teas, broths). Rest completely. Monitor temperature every 4 hours.' },
   { id: 'a2', doctorUsername: 'doctor1', name: 'Low Sodium Diet', text: 'Avoid extra salt. Restrict consumption of pickles, processed cheeses, and canned items.' },
   { id: 'a3', doctorUsername: 'doctor1', name: 'Diabetic Foot Care', text: 'Check feet daily for cuts or redness. Wear soft footwear. Keep feet clean and moisturized.' },
   { id: 'a4', doctorUsername: 'doctor1', name: 'Hydration Guidelines', text: 'Drink at least 3-4 liters of water daily to maintain electrolyte balance.' },
-
-  // doctor2
   { id: 'a5', doctorUsername: 'doctor2', name: 'Allergy Avoidance', text: 'Use a double-layer mask outdoors. Avoid dust, pet hair, and direct exposure to air conditioning vents.' },
   { id: 'a6', doctorUsername: 'doctor2', name: 'Ear Dryness Protocol', text: 'Do not allow water to enter ears during bathing. Use silicon earplugs. Do not use cotton buds.' }
 ];
 
-// Attach to window object for legacy script tag access
-window.INITIAL_CLINICS = INITIAL_CLINICS;
-window.INITIAL_USERS = INITIAL_USERS;
-window.INITIAL_PATIENTS = INITIAL_PATIENTS;
-window.INITIAL_VITALS = INITIAL_VITALS;
-window.INITIAL_TEMPLATES = INITIAL_TEMPLATES;
-window.INITIAL_DRUGS = INITIAL_DRUGS;
-window.INITIAL_TESTS = INITIAL_TESTS;
-window.INITIAL_ADVICE = INITIAL_ADVICE;
-
-// Seed Appointments with dynamic Indian names
 const INITIAL_APPOINTMENTS = [
   { id: 'APT-1001', clinicId: 'clinic-1', patientId: 'P-1001', patientName: 'Jayesh Mehta', doctorUsername: 'doctor1', doctorName: 'Dr. Rajesh Iyer', date: '2026-05-27', time: '10:00 AM', type: 'Consultation', status: 'Scheduled', createdBy: 'staff1', createdAt: '2026-05-26T09:00:00Z' },
   { id: 'APT-1002', clinicId: 'clinic-1', patientId: 'P-1002', patientName: 'Ananya Iyer', doctorUsername: 'doctor1', doctorName: 'Dr. Rajesh Iyer', date: '2026-05-27', time: '11:30 AM', type: 'Follow-up', status: 'Checked In', createdBy: 'staff1', createdAt: '2026-05-26T09:30:00Z' },
@@ -266,7 +236,6 @@ const INITIAL_APPOINTMENTS = [
   { id: 'APT-1010', clinicId: 'clinic-2', patientId: 'P-1003', patientName: 'Vikram Malhotra', doctorUsername: 'doctor3', doctorName: 'Dr. Shalini Gupta', date: '2026-05-26', time: '11:00 AM', type: 'Consultation', status: 'Completed', createdBy: 'cadmin2', createdAt: '2026-05-25T15:00:00Z' }
 ];
 
-// Rich Bills Dataset spanning different dates, payment modes, and doctors
 const INITIAL_BILLS = [
   { 
     id: 'INV-1001', 
@@ -425,17 +394,11 @@ const INITIAL_ATTENDANCE = [
   { id: 'ATT-1003', clinicId: 'clinic-1', username: 'staff2', name: 'Amit Patel', loginTime: '2026-05-27T09:00:00Z', logoutTime: '2026-05-27T17:00:00Z', date: '2026-05-27' }
 ];
 
-window.INITIAL_APPOINTMENTS = INITIAL_APPOINTMENTS;
-window.INITIAL_BILLS = INITIAL_BILLS;
-window.INITIAL_INSURANCE = INITIAL_INSURANCE;
-window.INITIAL_ATTENDANCE = INITIAL_ATTENDANCE;
-
-// Doctor appointment slot configurations (set by Clinic Admin)
 const INITIAL_DOCTOR_SLOTS = [
   {
     doctorUsername: 'doctor1',
     clinicId: 'clinic-1',
-    slotDuration: 30, // minutes
+    slotDuration: 30,
     workDays: ['Mon','Tue','Wed','Thu','Fri'],
     sessions: [
       { label: 'Morning', start: '09:00', end: '13:00' },
@@ -463,8 +426,45 @@ const INITIAL_DOCTOR_SLOTS = [
   }
 ];
 
-// Portal patient accounts (self-registered via landing page — separate from clinic patient records)
-const INITIAL_PATIENT_ACCOUNTS = [];
+const INITIAL_DRUG_CATEGORIES = [
+  { id: 'cat-1', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'Antibiotics' },
+  { id: 'cat-2', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'NSAIDs/Analgesics' },
+  { id: 'cat-3', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'Antihistamines' },
+  { id: 'cat-4', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'Derma' },
+  { id: 'cat-5', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'General' },
+  { id: 'cat-6', clinicId: 'clinic-1', doctorUsername: 'doctor2', name: 'Antibiotics' },
+  { id: 'cat-7', clinicId: 'clinic-1', doctorUsername: 'doctor2', name: 'General' },
+  { id: 'cat-8', clinicId: 'clinic-2', doctorUsername: 'doctor3', name: 'Dental' }
+];
 
-window.INITIAL_DOCTOR_SLOTS = INITIAL_DOCTOR_SLOTS;
-window.INITIAL_PATIENT_ACCOUNTS = INITIAL_PATIENT_ACCOUNTS;
+const INITIAL_SPECIALITIES = [
+  { clinicId: 'clinic-1', name: 'General Medicine', icon: '🩺' },
+  { clinicId: 'clinic-1', name: 'ENT', icon: '👂' },
+  { clinicId: 'clinic-1', name: 'Dental', icon: '🦷' },
+  { clinicId: 'clinic-1', name: 'Dermatology', icon: '🧴' },
+  { clinicId: 'clinic-1', name: 'Ophthalmology', icon: '👁️' },
+  { clinicId: 'clinic-1', name: 'Orthopaedics', icon: '🦴' },
+  { clinicId: 'clinic-1', name: 'Gynaecology', icon: '👩‍⚕️' },
+  { clinicId: 'clinic-1', name: 'Paediatrics', icon: '👶' },
+  { clinicId: 'clinic-1', name: 'Cardiology', icon: '❤️' },
+  { clinicId: 'clinic-1', name: 'Neurology', icon: '🧠' },
+  { clinicId: 'clinic-2', name: 'Dental', icon: '🦷' }
+];
+
+module.exports = {
+  INITIAL_CLINICS,
+  INITIAL_USERS,
+  INITIAL_PATIENTS,
+  INITIAL_VITALS,
+  INITIAL_TEMPLATES,
+  INITIAL_DRUGS,
+  INITIAL_TESTS,
+  INITIAL_ADVICE,
+  INITIAL_APPOINTMENTS,
+  INITIAL_BILLS,
+  INITIAL_INSURANCE,
+  INITIAL_ATTENDANCE,
+  INITIAL_DOCTOR_SLOTS,
+  INITIAL_DRUG_CATEGORIES,
+  INITIAL_SPECIALITIES
+};

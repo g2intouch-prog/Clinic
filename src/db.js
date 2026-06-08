@@ -5,26 +5,67 @@ const IS_MOCK_MODE_KEY = 'mediflow_use_mock';
 // Seed localStorage if empty or outdated
 function initializeLocalStorage() {
   const currentSeedVersion = localStorage.getItem('mediflow_seed_version');
-  if (!localStorage.getItem('mediflow_seeded') || currentSeedVersion !== 'v2') {
-    localStorage.setItem('mediflow_clinics', JSON.stringify(window.INITIAL_CLINICS));
-    localStorage.setItem('mediflow_users', JSON.stringify(window.INITIAL_USERS));
-    localStorage.setItem('mediflow_patients', JSON.stringify(window.INITIAL_PATIENTS));
-    localStorage.setItem('mediflow_vitals', JSON.stringify(window.INITIAL_VITALS));
-    localStorage.setItem('mediflow_templates', JSON.stringify(window.INITIAL_TEMPLATES));
-    localStorage.setItem('mediflow_drugs', JSON.stringify(window.INITIAL_DRUGS));
-    localStorage.setItem('mediflow_tests', JSON.stringify(window.INITIAL_TESTS));
-    localStorage.setItem('mediflow_advice', JSON.stringify(window.INITIAL_ADVICE));
+  const usersSeeded = localStorage.getItem('mediflow_users');
+  const clinicsSeeded = localStorage.getItem('mediflow_clinics');
+  
+  const needsSeed = !localStorage.getItem('mediflow_seeded') || 
+                    currentSeedVersion !== 'v6' || 
+                    !usersSeeded || 
+                    !clinicsSeeded || 
+                    JSON.parse(usersSeeded || '[]').length === 0;
+
+  if (needsSeed) {
+    localStorage.setItem('mediflow_clinics', JSON.stringify(window.INITIAL_CLINICS || []));
+    localStorage.setItem('mediflow_users', JSON.stringify(window.INITIAL_USERS || []));
+    localStorage.setItem('mediflow_patients', JSON.stringify(window.INITIAL_PATIENTS || []));
+    localStorage.setItem('mediflow_vitals', JSON.stringify(window.INITIAL_VITALS || []));
+    localStorage.setItem('mediflow_templates', JSON.stringify(window.INITIAL_TEMPLATES || []));
+    localStorage.setItem('mediflow_drugs', JSON.stringify(window.INITIAL_DRUGS || []));
+    localStorage.setItem('mediflow_tests', JSON.stringify(window.INITIAL_TESTS || []));
+    localStorage.setItem('mediflow_advice', JSON.stringify(window.INITIAL_ADVICE || []));
     localStorage.setItem('mediflow_appointments', JSON.stringify(window.INITIAL_APPOINTMENTS || []));
     localStorage.setItem('mediflow_bills', JSON.stringify(window.INITIAL_BILLS || []));
     localStorage.setItem('mediflow_insurance', JSON.stringify(window.INITIAL_INSURANCE || []));
     localStorage.setItem('mediflow_attendance', JSON.stringify(window.INITIAL_ATTENDANCE || []));
+    localStorage.setItem('mediflow_doctor_slots', JSON.stringify(window.INITIAL_DOCTOR_SLOTS || []));
+    localStorage.setItem('mediflow_patient_accounts', JSON.stringify(window.INITIAL_PATIENT_ACCOUNTS || []));
+    localStorage.setItem('mediflow_prescriptions', JSON.stringify([]));
+    
+    // Seed default categories
+    const defaultCategories = [
+      { id: 'cat-1', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'Antibiotics' },
+      { id: 'cat-2', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'NSAIDs/Analgesics' },
+      { id: 'cat-3', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'Antihistamines' },
+      { id: 'cat-4', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'Derma' },
+      { id: 'cat-5', clinicId: 'clinic-1', doctorUsername: 'doctor1', name: 'General' },
+      { id: 'cat-6', clinicId: 'clinic-1', doctorUsername: 'doctor2', name: 'Antibiotics' },
+      { id: 'cat-7', clinicId: 'clinic-1', doctorUsername: 'doctor2', name: 'General' },
+      { id: 'cat-8', clinicId: 'clinic-2', doctorUsername: 'doctor3', name: 'Dental' }
+    ];
+    localStorage.setItem('mediflow_drug_categories', JSON.stringify(defaultCategories));
+
+    // Seed default specialities
+    const defaultSpecialities = [
+      { clinicId: 'clinic-1', name: 'General Medicine', icon: '🩺' },
+      { clinicId: 'clinic-1', name: 'ENT', icon: '👂' },
+      { clinicId: 'clinic-1', name: 'Dental', icon: '🦷' },
+      { clinicId: 'clinic-1', name: 'Dermatology', icon: '🧴' },
+      { clinicId: 'clinic-1', name: 'Ophthalmology', icon: '👁️' },
+      { clinicId: 'clinic-1', name: 'Orthopaedics', icon: '🦴' },
+      { clinicId: 'clinic-1', name: 'Gynaecology', icon: '👩‍⚕️' },
+      { clinicId: 'clinic-1', name: 'Paediatrics', icon: '👶' },
+      { clinicId: 'clinic-1', name: 'Cardiology', icon: '❤️' },
+      { clinicId: 'clinic-1', name: 'Neurology', icon: '🧠' },
+      { clinicId: 'clinic-2', name: 'Dental', icon: '🦷' }
+    ];
+    localStorage.setItem('mediflow_specialities', JSON.stringify(defaultSpecialities));
     
     // Seed clinic headers with empty defaults
     localStorage.setItem('mediflow_headers', JSON.stringify({}));
     
-    localStorage.setItem('mediflow_seed_version', 'v2');
+    localStorage.setItem('mediflow_seed_version', 'v6');
     localStorage.setItem('mediflow_seeded', 'true');
-    console.log('LocalStorage initialized with version v2 Indian mock data.');
+    console.log('LocalStorage initialized with version v6 Indian mock data.');
   }
 }
 
@@ -42,9 +83,31 @@ async function checkServerConnection() {
 
 class DB {
   static async isCloudAvailable() {
-    // Check if we are running in production Netlify and server responds
+    if (this._cloudAvailable !== undefined) return this._cloudAvailable;
+
     const conn = await checkServerConnection();
-    return conn;
+    if (!conn) {
+      this._cloudAvailable = false;
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check' })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        this._cloudAvailable = !!result.cloudActive;
+        return this._cloudAvailable;
+      }
+    } catch (e) {
+      console.warn('Error checking cloud availability, falling back to local storage:', e);
+    }
+
+    this._cloudAvailable = false;
+    return false;
   }
 
   // Generic fetch wrapper that falls back to LocalStorage
@@ -59,7 +122,9 @@ class DB {
         });
         if (response.ok) {
           const result = await response.json();
-          return result.data;
+          if (result && result.data !== undefined) {
+            return result.data;
+          }
         }
       } catch (err) {
         console.warn('Netlify Database function error, falling back to LocalStorage:', err);
@@ -70,7 +135,14 @@ class DB {
 
   // Local Storage Execution Engine (Mock Database)
   static localExecute(action, payload) {
-    const getList = (key) => JSON.parse(localStorage.getItem(key) || '[]');
+    const getList = (key) => {
+      try {
+        return JSON.parse(localStorage.getItem(key) || '[]');
+      } catch (e) {
+        console.error(`Error parsing localStorage key "${key}":`, e);
+        return [];
+      }
+    };
     const saveList = (key, data) => localStorage.setItem(key, JSON.stringify(data));
 
     switch (action) {
@@ -347,6 +419,177 @@ class DB {
         }
         saveList('mediflow_attendance', attendance);
         return payload;
+      }
+
+      // --- Patient Portal Accounts ---
+      case 'getPatientAccounts': {
+        return getList('mediflow_patient_accounts');
+      }
+
+      case 'getPatientAccountByPhone': {
+        const accounts = getList('mediflow_patient_accounts');
+        return accounts.find(a => a.phone === payload.phone) || null;
+      }
+
+      case 'savePatientAccount': {
+        const accounts = getList('mediflow_patient_accounts');
+        const index = accounts.findIndex(a => a.id === payload.id);
+        if (index > -1) {
+          accounts[index] = { ...accounts[index], ...payload };
+        } else {
+          accounts.push(payload);
+        }
+        saveList('mediflow_patient_accounts', accounts);
+        return payload;
+      }
+
+      // --- Doctor Slot Configurations (set by Clinic Admin) ---
+      case 'getDoctorSlots': {
+        const slots = getList('mediflow_doctor_slots');
+        return slots.filter(s => s.clinicId === payload.clinicId);
+      }
+
+      case 'getDoctorSlotConfig': {
+        const slots = getList('mediflow_doctor_slots');
+        return slots.find(s => s.doctorUsername === payload.doctorUsername && s.clinicId === payload.clinicId) || null;
+      }
+
+      case 'saveDoctorSlotConfig': {
+        const slots = getList('mediflow_doctor_slots');
+        const index = slots.findIndex(s => s.doctorUsername === payload.doctorUsername && s.clinicId === payload.clinicId);
+        if (index > -1) {
+          slots[index] = { ...slots[index], ...payload };
+        } else {
+          slots.push(payload);
+        }
+        saveList('mediflow_doctor_slots', slots);
+        return payload;
+      }
+
+      // --- Saved Prescriptions (doctor saves for patient record) ---
+      case 'getPrescriptions': {
+        const prescriptions = getList('mediflow_prescriptions');
+        if (payload.clinicId && payload.patientId) {
+          return prescriptions.filter(p => p.clinicId === payload.clinicId && p.patientId === payload.patientId);
+        }
+        if (payload.clinicId) {
+          return prescriptions.filter(p => p.clinicId === payload.clinicId);
+        }
+        return prescriptions;
+      }
+
+      case 'savePrescription': {
+        const prescriptions = getList('mediflow_prescriptions');
+        const index = prescriptions.findIndex(p => p.id === payload.id);
+        if (index > -1) {
+          prescriptions[index] = { ...prescriptions[index], ...payload };
+        } else {
+          prescriptions.push(payload);
+        }
+        saveList('mediflow_prescriptions', prescriptions);
+        return payload;
+      }
+
+      // --- Patient appointments (cross-clinic by phone) ---
+      case 'getAppointmentsByPhone': {
+        const appointments = getList('mediflow_appointments');
+        return appointments.filter(a => a.patientPhone === payload.phone);
+      }
+
+      // --- Patient bills (cross-clinic by phone) ---
+      case 'getBillsByPhone': {
+        const bills = getList('mediflow_bills');
+        return bills.filter(b => b.patientPhone === payload.phone);
+      }
+
+      // --- Drug Categories ---
+      case 'getDrugCategories': {
+        const categories = getList('mediflow_drug_categories');
+        return categories.filter(c => c.doctorUsername === payload.doctorUsername && c.clinicId === payload.clinicId);
+      }
+
+      case 'saveDrugCategory': {
+        const categories = getList('mediflow_drug_categories');
+        const index = categories.findIndex(c => c.id === payload.id);
+        if (index > -1) {
+          categories[index] = { ...categories[index], ...payload };
+        } else {
+          categories.push(payload);
+        }
+        saveList('mediflow_drug_categories', categories);
+        return payload;
+      }
+
+      case 'deleteDrugCategory': {
+        const categories = getList('mediflow_drug_categories');
+        const filtered = categories.filter(c => c.id !== payload.id);
+        saveList('mediflow_drug_categories', filtered);
+        return { success: true };
+      }
+
+      // --- Specialities ---
+      case 'getSpecialities': {
+        const specs = getList('mediflow_specialities');
+        return specs.filter(s => s.clinicId === payload.clinicId);
+      }
+
+      case 'saveSpeciality': {
+        const specs = getList('mediflow_specialities');
+        const { clinicId, name, icon, oldName } = payload;
+        
+        if (oldName) {
+          const index = specs.findIndex(s => s.clinicId === clinicId && s.name.toLowerCase() === oldName.toLowerCase());
+          if (index > -1) {
+            specs[index] = { clinicId, name, icon };
+          } else {
+            specs.push({ clinicId, name, icon });
+          }
+          
+          // Cascading update: update all doctors of this clinic who had oldName to name
+          if (oldName.toLowerCase() !== name.toLowerCase()) {
+            const users = getList('mediflow_users');
+            let updated = false;
+            users.forEach(u => {
+              if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality === oldName) {
+                u.speciality = name;
+                updated = true;
+              }
+            });
+            if (updated) {
+              saveList('mediflow_users', users);
+            }
+          }
+        } else {
+          const index = specs.findIndex(s => s.clinicId === clinicId && s.name.toLowerCase() === name.toLowerCase());
+          if (index > -1) {
+            specs[index] = { clinicId, name, icon };
+          } else {
+            specs.push({ clinicId, name, icon });
+          }
+        }
+        saveList('mediflow_specialities', specs);
+        return payload;
+      }
+
+      case 'deleteSpeciality': {
+        const specs = getList('mediflow_specialities');
+        const { clinicId, name } = payload;
+        const filtered = specs.filter(s => !(s.clinicId === clinicId && s.name.toLowerCase() === name.toLowerCase()));
+        saveList('mediflow_specialities', filtered);
+        
+        // Cascading deletion: set matching doctor specialties in this clinic to empty string
+        const users = getList('mediflow_users');
+        let updated = false;
+        users.forEach(u => {
+          if (u.clinicId === clinicId && u.role === 'doctor' && u.speciality === name) {
+            u.speciality = '';
+            updated = true;
+          }
+        });
+        if (updated) {
+          saveList('mediflow_users', users);
+        }
+        return { success: true };
       }
 
       default:
