@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mediflow-v2';
+const CACHE_NAME = 'mediflow-v3';
 const ASSETS = [
   '/',
   '/index.html',
