@@ -1917,7 +1917,12 @@ window.updateAptStatus = async function(id, newStatus) {
   if (apt) {
     apt.status = newStatus;
     await DB.request('saveAppointment', apt);
-    loadAppointments();
+    if (typeof loadAppointments === 'function') {
+      try { loadAppointments(); } catch (e) {}
+    }
+    if (typeof renderCadminAppointments === 'function') {
+      try { renderCadminAppointments(); } catch (e) {}
+    }
   }
 };
 
@@ -2574,7 +2579,7 @@ window.renderCadminAppointments = async function() {
   tbody.innerHTML = '';
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No matching appointments found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No matching appointments found.</td></tr>';
     return;
   }
 
@@ -2612,6 +2617,12 @@ window.renderCadminAppointments = async function() {
         <span class="user-badge" style="background:${badgeBg}; color:${badgeColor}; border:1px solid rgba(255,255,255,0.05);">
           ${apt.status}
         </span>
+      </td>
+      <td>
+        <div style="display:flex; gap:0.25rem;">
+          ${apt.status === 'Pending Confirmation' ? `<button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.4rem; font-size:0.75rem; background:rgba(16,185,129,0.2); color:#10b981; border-color:#10b981;" onclick="confirmPatientAppointment('${apt.id}')">✓ Accept</button>` : ''}
+          ${apt.status !== 'Completed' && apt.status !== 'Cancelled' ? `<button class="btn btn-secondary btn-sm btn-danger" style="padding:0.2rem 0.4rem; font-size:0.75rem;" onclick="updateAptStatus('${apt.id}', 'Cancelled')">Cancel</button>` : ''}
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -5122,7 +5133,7 @@ async function showAppointmentTicket(aptId) {
   } else if (currentUser && currentUser.clinicId) {
     allApts = await DB.request('getAppointments', { clinicId: currentUser.clinicId });
   } else {
-    allApts = JSON.parse(localStorage.getItem('mediflow_appointments') || '[]');
+    allApts = [];
   }
   const apt = allApts.find(a => a.id === aptId);
   if (!apt) return;
@@ -5161,7 +5172,7 @@ async function openUpiPayment(aptId) {
   } else if (currentUser && currentUser.clinicId) {
     allApts = await DB.request('getAppointments', { clinicId: currentUser.clinicId });
   } else {
-    allApts = JSON.parse(localStorage.getItem('mediflow_appointments') || '[]');
+    allApts = [];
   }
   const apt = allApts.find(a => a.id === aptId);
   if (!apt) return;
@@ -5183,7 +5194,7 @@ async function openUpiPaymentForBill(billId) {
   } else if (currentUser && currentUser.clinicId) {
     allBills = await DB.request('getBills', { clinicId: currentUser.clinicId });
   } else {
-    allBills = JSON.parse(localStorage.getItem('mediflow_bills') || '[]');
+    allBills = [];
   }
   const bill = allBills.find(b => b.id === billId);
   if (!bill) return;
@@ -5225,7 +5236,7 @@ async function confirmUpiPayment() {
   } else if (currentUser && currentUser.clinicId) {
     allApts = await DB.request('getAppointments', { clinicId: currentUser.clinicId });
   } else {
-    allApts = JSON.parse(localStorage.getItem('mediflow_appointments') || '[]');
+    allApts = [];
   }
   const apt = allApts.find(a => a.id === currentUpiAppointmentId);
   if (apt) {
@@ -5241,7 +5252,7 @@ async function confirmUpiPayment() {
   } else if (currentUser && currentUser.clinicId) {
     allBills = await DB.request('getBills', { clinicId: currentUser.clinicId });
   } else {
-    allBills = JSON.parse(localStorage.getItem('mediflow_bills') || '[]');
+    allBills = [];
   }
   const bill = allBills.find(b => b.id === currentUpiAppointmentId);
   if (bill) {

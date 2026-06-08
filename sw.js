@@ -7,8 +7,7 @@ const ASSETS = [
   '/assets/icon-512.svg',
   '/src/app.js',
   '/src/styles.css',
-  '/src/db.js',
-  '/src/mockData.js'
+  '/src/db.js'
 ];
 
 self.addEventListener('install', (e) => {
