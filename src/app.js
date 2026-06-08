@@ -33,10 +33,10 @@ async function checkDBStatus() {
   const cloudConnected = await DB.isCloudAvailable();
   if (cloudConnected) {
     dot.className = 'dot green';
-    text.textContent = 'Netlify Cloud (Connected)';
+    text.textContent = 'Vercel Cloud DB (Connected)';
   } else {
-    dot.className = 'dot yellow';
-    text.textContent = 'Local Storage DB (Active)';
+    dot.className = 'dot red';
+    text.textContent = 'Cloud DB Offline / Connection Error';
   }
 }
 
@@ -288,73 +288,90 @@ if (localStorage.getItem('mediflow_light_theme') === 'true') {
 // -------------------------------------------------------------
 async function handleLogin(e) {
   e.preventDefault();
-  const usernameInput = document.getElementById('login-username').value.trim();
-  const passwordInput = document.getElementById('login-password').value;
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn ? submitBtn.textContent : 'Authenticate Access';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Authenticating...';
+  }
 
-  const users = await DB.request('getUsers');
-  const user = users.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
+  try {
+    const usernameInput = document.getElementById('login-username').value.trim();
+    const passwordInput = document.getElementById('login-password').value;
 
-  if (user) {
-    // Check if account status is Suspended
-    if (user.status === 'Suspended') {
-      alert('Access Denied: Your account has been suspended by the Super Admin.');
-      return;
-    }
+    const users = await DB.request('getUsers');
+    const user = users.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
 
-    // Clinic Admin: log directly into their assigned clinic workspace
-    if (user.role === 'clinic_admin') {
-      if (!user.clinicId) {
-        alert('Access Denied: No clinic has been assigned to this administrator. Please contact the Super Admin.');
+    if (user) {
+      // Check if account status is Suspended
+      if (user.status === 'Suspended') {
+        alert('Access Denied: Your account has been suspended by the Super Admin.');
         return;
       }
-      const clinics = await DB.request('getClinics');
-      const assignedClinic = clinics.find(c => c.id === user.clinicId);
-      if (!assignedClinic) {
-        alert('Access Denied: The assigned clinic does not exist in the system database.');
+
+      // Clinic Admin: log directly into their assigned clinic workspace
+      if (user.role === 'clinic_admin') {
+        if (!user.clinicId) {
+          alert('Access Denied: No clinic has been assigned to this administrator. Please contact the Super Admin.');
+          return;
+        }
+        const clinics = await DB.request('getClinics');
+        const assignedClinic = clinics.find(c => c.id === user.clinicId);
+        if (!assignedClinic) {
+          alert('Access Denied: The assigned clinic does not exist in the system database.');
+          return;
+        }
+        if (assignedClinic.subscription !== 'Active') {
+          alert('Access Denied: The assigned clinic subscription is suspended or inactive. Please contact the Super Admin.');
+          return;
+        }
+
+        currentUser = user;
+        sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
+        loginSuccess(currentUser);
         return;
       }
-      if (assignedClinic.subscription !== 'Active') {
-        alert('Access Denied: The assigned clinic subscription is suspended or inactive. Please contact the Super Admin.');
-        return;
+
+      // Check if subscription active for Staff / Doctors
+      if (user.clinicId) {
+        const clinics = await DB.request('getClinics');
+        const clinic = clinics.find(c => c.id === user.clinicId);
+        if (!clinic || clinic.subscription !== 'Active') {
+          alert('Access Denied: The clinic subscription is currently suspended or inactive. Please contact the Super Admin.');
+          return;
+        }
+      }
+
+      // Save attendance log for staff login
+      if (user.role === 'staff') {
+        const attId = `ATT-${Date.now()}`;
+        const attendanceEntry = {
+          id: attId,
+          clinicId: user.clinicId,
+          username: user.username,
+          name: user.name,
+          loginTime: new Date().toISOString(),
+          logoutTime: null,
+          date: new Date().toISOString().split('T')[0]
+        };
+        await DB.request('saveAttendance', attendanceEntry);
+        sessionStorage.setItem('mediflow_attendance_id', attId);
       }
 
       currentUser = user;
       sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
       loginSuccess(currentUser);
-      return;
+    } else {
+      alert('Access Failed: Invalid Username or Password.');
     }
-
-    // Check if subscription active for Staff / Doctors
-    if (user.clinicId) {
-      const clinics = await DB.request('getClinics');
-      const clinic = clinics.find(c => c.id === user.clinicId);
-      if (!clinic || clinic.subscription !== 'Active') {
-        alert('Access Denied: The clinic subscription is currently suspended or inactive. Please contact the Super Admin.');
-        return;
-      }
+  } catch (error) {
+    console.error('Login error:', error);
+    alert(`Connection Error: ${error.message || 'Could not connect to the database. Please verify your Vercel KV environment variables are configured correctly.'}`);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
     }
-
-    // Save attendance log for staff login
-    if (user.role === 'staff') {
-      const attId = `ATT-${Date.now()}`;
-      const attendanceEntry = {
-        id: attId,
-        clinicId: user.clinicId,
-        username: user.username,
-        name: user.name,
-        loginTime: new Date().toISOString(),
-        logoutTime: null,
-        date: new Date().toISOString().split('T')[0]
-      };
-      await DB.request('saveAttendance', attendanceEntry);
-      sessionStorage.setItem('mediflow_attendance_id', attId);
-    }
-
-    currentUser = user;
-    sessionStorage.setItem('mediflow_session', JSON.stringify(currentUser));
-    loginSuccess(currentUser);
-  } else {
-    alert('Access Failed: Invalid Username or Password.');
   }
 }
 
