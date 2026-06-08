@@ -34,7 +34,17 @@ async function executeDbAction(action, payload) {
   await ensureSeeded();
 
   const getList = async (key) => {
-    return (await kv.get(key)) || [];
+    const raw = await kv.get(key);
+    if (!raw) return [];
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw);
+      } catch (err) {
+        console.error(`Error parsing KV key ${key}:`, err);
+        return [];
+      }
+    }
+    return raw;
   };
   const saveList = async (key, data) => {
     await kv.set(key, data);
